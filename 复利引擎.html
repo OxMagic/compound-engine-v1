@@ -853,6 +853,111 @@
 
   .footer a:hover { text-shadow: 0 0 8px var(--mech-primary); }
 
+  /* ===== 推广区域 ===== */
+  .promo-section {
+    margin-top: 24px;
+    margin-bottom: 24px;
+    padding: 20px;
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.05), rgba(123, 47, 255, 0.05));
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    border-radius: 4px;
+  }
+
+  .promo-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: #00d4ff;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .promo-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  @media (max-width: 768px) {
+    .promo-cards { grid-template-columns: 1fr; }
+  }
+
+  .promo-card {
+    background: linear-gradient(135deg, rgba(10, 22, 40, 0.8), rgba(13, 31, 60, 0.8));
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    border-radius: 4px;
+    padding: 16px;
+    transition: all 0.3s ease;
+  }
+
+  .promo-card:hover {
+    border-color: rgba(0, 212, 255, 0.6);
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+  }
+
+  .promo-card-name {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: #00ff88;
+    margin-bottom: 8px;
+  }
+
+  .promo-card-desc {
+    font-size: 12px;
+    color: #7aa8cc;
+    margin-bottom: 12px;
+    line-height: 1.6;
+  }
+
+  .promo-link-btn {
+    display: inline-block;
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(0, 212, 255, 0.1));
+    border: 1px solid rgba(0, 212, 255, 0.4);
+    color: #00d4ff;
+    padding: 8px 16px;
+    border-radius: 3px;
+    font-size: 12px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: 'Rajdhani', sans-serif;
+  }
+
+  .promo-link-btn:hover {
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.3), rgba(0, 212, 255, 0.15));
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
+  }
+
+  .promo-guide {
+    background: rgba(0, 212, 255, 0.05);
+    border-left: 3px solid rgba(0, 212, 255, 0.3);
+    padding: 12px 16px;
+    border-radius: 2px;
+    font-size: 12px;
+    color: #7aa8cc;
+    line-height: 1.8;
+  }
+
+  .promo-guide strong {
+    color: #00d4ff;
+    font-weight: 600;
+  }
+
+  .promo-guide ol {
+    margin-left: 20px;
+    margin-top: 8px;
+  }
+
+  .promo-guide li {
+    margin-bottom: 4px;
+  }
+
   /* ===== 自动下单面板 ===== */
   .auto-trade-panel {
     margin-top: 18px;
@@ -1657,6 +1762,48 @@
 
     <!-- 下单日志 -->
     <div id="atLog" style="margin-top:10px;max-height:140px;overflow-y:auto;background:var(--bg-input);border-radius:8px;padding:8px;font-size:11px;color:var(--text-secondary);font-family:monospace;display:none"></div>
+  </div>
+
+  <!-- 推广区域 -->
+  <div class="promo-section">
+    <div class="promo-title">
+      🎯 推荐交易所 — 注册即送体验金
+    </div>
+    <div class="promo-cards">
+      <!-- HiBT -->
+      <div class="promo-card">
+        <div class="promo-card-name">🎲 HiBT（好玩比特）</div>
+        <div class="promo-card-desc">
+          注册送 <strong style="color:#00ff88">5分钟体验金</strong>，0成本体验合约交易<br>
+          界面简洁，新手友好，最低下注 <strong style="color:#ffd60a">3U</strong>
+        </div>
+        <a href="https://www.hibt.com/register?promotionCode=GBSQ" target="_blank" rel="noopener" class="promo-link-btn">
+          🚀 立即注册 HiBT
+        </a>
+      </div>
+      <!-- 币安 -->
+      <div class="promo-card">
+        <div class="promo-card-name">🏦 币安 Binance</div>
+        <div class="promo-card-desc">
+          全球最大加密货币交易所<br>
+          合约交易首选，本引擎实时数据源，流动性强
+        </div>
+        <a href="https://www.bsmkweb.cc/referral/earn-together/refer2earn-usdc/claim?hl=zh-CN&ref=GRO_28502_6FN1M" target="_blank" rel="noopener" class="promo-link-btn">
+          🚀 立即注册币安
+        </a>
+      </div>
+    </div>
+    <div class="promo-guide">
+      <strong>📋 快速上手教程：</strong>
+      <ol>
+        <li>点击上方链接注册交易所账号（支持手机号/邮箱）</li>
+        <li>完成身份认证（KYC），部分平台可跳过</li>
+        <li>入金：充值 USDT（推荐从钱包转账，手续费最低）</li>
+        <li>开合约账户，选择 BTC/USDT 永续合约</li>
+        <li>设置自动下单坐标标定，开启联动模式，引擎自动下单</li>
+      </ol>
+      <span style="color:var(--text-dim); font-size:11px;">⚠️ 合约交易有风险，请使用可承受的资金，切勿全仓操作</span>
+    </div>
   </div>
 
   <!-- FOOTER -->
