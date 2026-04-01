@@ -1,0 +1,3121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>复利引擎 | Compound Engine</title>
+<script src="lib/lightweight-charts.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap');
+
+  :root {
+    --mech-primary: #00d4ff;
+    --mech-secondary: #0a84ff;
+    --mech-accent: #7b2fff;
+    --mech-green: #00ff88;
+    --mech-red: #ff2d55;
+    --mech-yellow: #ffd60a;
+    --bg-main: #060d1a;
+    --bg-panel: #0a1628;
+    --bg-card: #0d1f3c;
+    --bg-input: #081220;
+    --border-glow: rgba(0,212,255,0.3);
+    --text-primary: #e0f4ff;
+    --text-secondary: #7aa8cc;
+    --text-dim: #3d6080;
+    --shadow-neon: 0 0 20px rgba(0,212,255,0.2), 0 0 40px rgba(0,212,255,0.1);
+    --shadow-green: 0 0 20px rgba(0,255,136,0.3);
+    --shadow-red: 0 0 20px rgba(255,45,85,0.3);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg-main);
+    color: var(--text-primary);
+    font-family: 'Rajdhani', 'Microsoft YaHei', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* 扫描线背景 */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,212,255,0.015) 2px,
+      rgba(0,212,255,0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* 网格背景 */
+  body::after {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.05) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 0 20px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ===== HEADER ===== */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border-glow);
+    position: relative;
+  }
+
+  .header::after {
+    content: '';
+    position: absolute;
+    bottom: -1px; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--mech-primary), transparent);
+    animation: scanH 3s linear infinite;
+  }
+
+  @keyframes scanH {
+    0% { transform: scaleX(0); transform-origin: left; }
+    50% { transform: scaleX(1); transform-origin: left; }
+    50.01% { transform: scaleX(1); transform-origin: right; }
+    100% { transform: scaleX(0); transform-origin: right; }
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 48px;
+    height: 48px;
+    position: relative;
+  }
+
+  .logo-icon svg { width: 100%; height: 100%; }
+
+  .logo-text h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 22px;
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--mech-primary), var(--mech-accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .logo-text p {
+    font-size: 11px;
+    color: var(--text-secondary);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+  }
+
+  .header-status {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .price-display {
+    text-align: right;
+  }
+
+  .price-display .price {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--mech-primary);
+    text-shadow: 0 0 20px rgba(0,212,255,0.5);
+  }
+
+  .price-display .change {
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .change.up { color: var(--mech-green); }
+  .change.down { color: var(--mech-red); }
+
+  .status-dot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--mech-green);
+    box-shadow: 0 0 8px var(--mech-green);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  .dot.offline { background: var(--mech-red); box-shadow: 0 0 8px var(--mech-red); animation: none; }
+  .dot.waiting { background: var(--mech-yellow); box-shadow: 0 0 8px var(--mech-yellow); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  /* ===== PANEL BASE ===== */
+  .panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-glow);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--mech-primary), transparent);
+  }
+
+  /* 切角效果 */
+  .clip-tl { clip-path: polygon(20px 0%, 100% 0%, 100% 100%, 0% 100%, 0% 20px); }
+  .clip-tr { clip-path: polygon(0% 0%, calc(100% - 20px) 0%, 100% 20px, 100% 100%, 0% 100%); }
+  .clip-bl { clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 20px 100%, 0% calc(100% - 20px)); }
+  .clip-br { clip-path: polygon(0% 0%, 100% 0%, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0% 100%); }
+  .clip-all { clip-path: polygon(16px 0%, calc(100% - 16px) 0%, 100% 16px, 100% calc(100% - 16px), calc(100% - 16px) 100%, 16px 100%, 0% calc(100% - 16px), 0% 16px); }
+
+  .panel-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--mech-primary);
+    padding: 12px 16px 8px;
+    border-bottom: 1px solid rgba(0,212,255,0.15);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .panel-title::before {
+    content: '';
+    width: 3px;
+    height: 14px;
+    background: var(--mech-primary);
+    box-shadow: 0 0 8px var(--mech-primary);
+  }
+
+  /* ===== MAIN LAYOUT ===== */
+  .main-layout {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 16px;
+    margin-top: 16px;
+  }
+
+  .left-col { display: flex; flex-direction: column; gap: 16px; }
+  .right-col { display: flex; flex-direction: column; gap: 16px; }
+
+  /* ===== CHART PANEL ===== */
+  .chart-panel { padding-bottom: 0; }
+
+  .chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px 8px;
+  }
+
+  .timeframe-btns {
+    display: flex;
+    gap: 4px;
+  }
+
+  .tf-btn {
+    background: transparent;
+    border: 1px solid var(--border-glow);
+    color: var(--text-secondary);
+    padding: 4px 10px;
+    font-size: 12px;
+    font-family: 'Rajdhani', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+    clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
+  }
+
+  .tf-btn:hover, .tf-btn.active {
+    background: rgba(0,212,255,0.15);
+    border-color: var(--mech-primary);
+    color: var(--mech-primary);
+    box-shadow: 0 0 10px rgba(0,212,255,0.2);
+  }
+
+  #chartContainer {
+    width: 100%;
+    height: 380px;
+  }
+
+  /* ===== SIGNAL BAR ===== */
+  .signal-bar {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1px;
+    background: var(--bg-main);
+  }
+
+  .signal-item {
+    background: var(--bg-panel);
+    padding: 10px 12px;
+    text-align: center;
+  }
+
+  .signal-item .label {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .signal-item .value {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .signal-item .bar {
+    height: 3px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+    margin-top: 4px;
+    overflow: hidden;
+  }
+
+  .signal-item .bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.5s ease;
+  }
+
+  /* ===== STATS PANEL ===== */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--bg-main);
+    padding: 0;
+  }
+
+  .stat-block {
+    background: var(--bg-card);
+    padding: 14px 16px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-block::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0;
+    width: 100%;
+    height: 2px;
+    background: currentColor;
+    opacity: 0.3;
+  }
+
+  .stat-block .stat-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .stat-block .stat-value {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+  }
+
+  .stat-block .stat-sub {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+  }
+
+  .stat-total { color: var(--mech-primary); }
+  .stat-win { color: var(--mech-green); }
+  .stat-lose { color: var(--mech-red); }
+  .stat-rate { color: var(--mech-yellow); }
+  .stat-streak { color: var(--mech-accent); }
+  .stat-profit { color: var(--mech-green); }
+
+  /* ===== ACTIVE ORDERS ===== */
+  .orders-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .order-slot {
+    border: 1px solid rgba(0,212,255,0.15);
+    border-radius: 4px;
+    padding: 12px;
+    min-height: 140px;
+    position: relative;
+    transition: all 0.3s;
+  }
+
+  .order-slot .slot-dir { font-family: 'Orbitron', sans-serif; font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+  .order-slot .slot-badge { font-family: 'Orbitron', sans-serif; font-size: 14px; font-weight: 900; letter-spacing: 1px; padding: 3px 10px; border-radius: 3px; display: inline-block; margin-bottom: 6px; }
+  .order-slot .badge-long { background: rgba(0,255,136,0.15); color: #00ff88; border: 1px solid rgba(0,255,136,0.4); }
+  .order-slot .badge-short { background: rgba(255,45,85,0.15); color: #ff2d55; border: 1px solid rgba(255,45,85,0.4); }
+  .order-slot .slot-price { font-family: 'Orbitron', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+  .order-slot .slot-meta { font-size: 11px; color: var(--text-dim); margin-bottom: 6px; }
+  .order-slot .slot-timer { font-family: 'Orbitron', sans-serif; font-size: 22px; font-weight: 900; letter-spacing: 2px; margin-bottom: 4px; }
+  .order-slot .slot-times { font-size: 10px; color: rgba(122,168,204,0.55); letter-spacing: 0.5px; }
+
+  .order-slot.empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    font-size: 12px;
+    letter-spacing: 2px;
+    border-style: dashed;
+  }
+
+  .order-slot.active-long {
+    border-color: var(--mech-green);
+    background: rgba(0,255,136,0.05);
+    box-shadow: inset 0 0 20px rgba(0,255,136,0.05);
+  }
+
+  .order-slot.active-short {
+    border-color: var(--mech-red);
+    background: rgba(255,45,85,0.05);
+    box-shadow: inset 0 0 20px rgba(255,45,85,0.05);
+  }
+
+  .order-direction {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 4px 10px;
+    margin-bottom: 8px;
+    clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+  }
+
+  .dir-long { background: rgba(0,255,136,0.2); color: var(--mech-green); }
+  .dir-short { background: rgba(255,45,85,0.2); color: var(--mech-red); }
+
+  .order-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+
+  .order-row .key { color: var(--text-dim); }
+  .order-row .val { color: var(--text-primary); font-weight: 600; }
+
+  .order-pnl {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    text-align: right;
+  }
+
+  .pnl-positive { color: var(--mech-green); font-family: 'Orbitron', sans-serif; font-size: 16px; }
+  .pnl-negative { color: var(--mech-red); font-family: 'Orbitron', sans-serif; font-size: 16px; }
+
+  .slot-id {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+
+  /* ===== RIGHT PANEL ===== */
+  /* Control Panel */
+  .control-panel { padding: 12px; }
+
+  .ctrl-section {
+    margin-bottom: 16px;
+  }
+
+  .ctrl-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .ctrl-input {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border-glow);
+    color: var(--text-primary);
+    padding: 8px 12px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    transition: border-color 0.2s;
+    clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+  }
+
+  .ctrl-input:focus {
+    outline: none;
+    border-color: var(--mech-primary);
+    box-shadow: 0 0 10px rgba(0,212,255,0.2);
+  }
+
+  .ctrl-select {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border-glow);
+    color: var(--text-primary);
+    padding: 8px 12px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M6 8L0 0h12z' fill='%2300d4ff'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+  }
+
+  .ctrl-select:focus { outline: none; border-color: var(--mech-primary); }
+
+  .ctrl-range-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+  }
+
+  .ctrl-range {
+    flex: 1;
+    accent-color: var(--mech-primary);
+    height: 4px;
+  }
+
+  .ctrl-range-val {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 13px;
+    color: var(--mech-primary);
+    min-width: 36px;
+    text-align: right;
+  }
+
+  /* Buttons */
+  .btn-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .mech-btn {
+    padding: 10px 16px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    cursor: pointer;
+    border: none;
+    clip-path: polygon(10px 0%, 100% 0%, calc(100% - 10px) 100%, 0% 100%);
+    transition: all 0.2s;
+    text-transform: uppercase;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .mech-btn::after {
+    content: '';
+    position: absolute;
+    top: -50%; left: -50%;
+    width: 200%; height: 200%;
+    background: linear-gradient(transparent, rgba(255,255,255,0.1), transparent);
+    transform: translateX(-100%) rotate(45deg);
+    transition: transform 0.4s;
+  }
+
+  .mech-btn:hover::after { transform: translateX(100%) rotate(45deg); }
+
+  .btn-start {
+    background: linear-gradient(135deg, #00b060, #00ff88);
+    color: #001a0a;
+  }
+
+  .btn-stop {
+    background: linear-gradient(135deg, #990020, #ff2d55);
+    color: #fff;
+  }
+
+  .btn-train {
+    background: linear-gradient(135deg, #4a0aff, #7b2fff);
+    color: #fff;
+    grid-column: span 2;
+  }
+
+  .btn-export {
+    background: linear-gradient(135deg, #004466, #0a84ff);
+    color: #fff;
+    grid-column: span 2;
+    margin-top: 4px;
+    padding: 8px;
+    font-size: 10px;
+  }
+
+  .mech-btn:hover { transform: translateY(-2px); filter: brightness(1.2); }
+  .mech-btn:active { transform: translateY(0); }
+  .mech-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  /* Train Progress */
+  .train-progress { margin-top: 12px; display: none; }
+
+  .train-progress.visible { display: block; }
+
+  .progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+  }
+
+  .progress-bar {
+    height: 6px;
+    background: var(--bg-input);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--mech-accent), var(--mech-primary));
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    box-shadow: 0 0 8px var(--mech-primary);
+  }
+
+  /* Confidence Meter */
+  .confidence-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .conf-ring {
+    position: relative;
+    width: 100px;
+    height: 100px;
+  }
+
+  .conf-ring svg { transform: rotate(-90deg); }
+
+  .conf-ring-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+  }
+
+  .conf-ring-text .conf-num {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--mech-primary);
+  }
+
+  .conf-ring-text .conf-sub {
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+
+  .signal-label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-align: center;
+    padding: 6px 20px;
+    clip-path: polygon(10px 0%, 100% 0%, calc(100% - 10px) 100%, 0% 100%);
+  }
+
+  .signal-long { background: rgba(0,255,136,0.2); color: var(--mech-green); border: 1px solid var(--mech-green); }
+  .signal-short { background: rgba(255,45,85,0.2); color: var(--mech-red); border: 1px solid var(--mech-red); }
+  .signal-wait { background: rgba(255,214,10,0.1); color: var(--mech-yellow); border: 1px solid var(--mech-yellow); }
+  .signal-train { background: rgba(123,47,255,0.2); color: var(--mech-accent); border: 1px solid var(--mech-accent); }
+
+  /* ===== MODEL SIGNALS ===== */
+  .model-signals { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+
+  .model-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .model-name {
+    font-size: 11px;
+    color: var(--text-secondary);
+    width: 80px;
+    flex-shrink: 0;
+    letter-spacing: 1px;
+  }
+
+  .model-bar-wrap {
+    flex: 1;
+    height: 14px;
+    background: var(--bg-input);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .model-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: all 0.5s ease;
+    position: relative;
+  }
+
+  .model-bar-val {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 10px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.9);
+    font-family: 'Orbitron', sans-serif;
+  }
+
+  .model-dir {
+    width: 32px;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 4px;
+  }
+
+  .dir-up { color: var(--mech-green); }
+  .dir-down { color: var(--mech-red); }
+  .dir-neutral { color: var(--text-dim); }
+
+  /* ===== WIN RATE CHART ===== */
+  .winrate-panel { padding: 12px; }
+  #winRateChart { max-height: 140px; }
+
+  /* ===== LOG ===== */
+  .log-panel { padding: 0; }
+
+  .log-content {
+    padding: 10px 12px;
+    height: 120px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    line-height: 1.6;
+  }
+
+  .log-content::-webkit-scrollbar { width: 4px; }
+  .log-content::-webkit-scrollbar-track { background: var(--bg-main); }
+  .log-content::-webkit-scrollbar-thumb { background: var(--border-glow); }
+
+  .log-line { margin-bottom: 2px; }
+  .log-time { color: var(--text-dim); margin-right: 8px; }
+  .log-info { color: var(--mech-primary); }
+  .log-success { color: var(--mech-green); }
+  .log-warn { color: var(--mech-yellow); }
+  .log-error { color: var(--mech-red); }
+
+  /* ===== HISTORY TABLE ===== */
+  .history-section { margin-top: 16px; }
+
+  .history-table-wrap {
+    overflow-x: auto;
+    padding: 0 12px 12px;
+    max-height: 240px;
+    overflow-y: auto;
+  }
+
+  .history-table-wrap::-webkit-scrollbar { height: 4px; width: 4px; }
+  .history-table-wrap::-webkit-scrollbar-thumb { background: var(--border-glow); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  thead th {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid rgba(0,212,255,0.15);
+    text-transform: uppercase;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    background: var(--bg-panel);
+    z-index: 2;
+  }
+
+  tbody td {
+    padding: 7px 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    white-space: nowrap;
+  }
+
+  tbody tr:hover { background: rgba(0,212,255,0.04); }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    clip-path: polygon(4px 0%, 100% 0%, calc(100% - 4px) 100%, 0% 100%);
+  }
+
+  .badge-long { background: rgba(0,255,136,0.2); color: var(--mech-green); }
+  .badge-short { background: rgba(255,45,85,0.2); color: var(--mech-red); }
+  .badge-win { background: rgba(0,255,136,0.15); color: var(--mech-green); }
+  .badge-lose { background: rgba(255,45,85,0.15); color: var(--mech-red); }
+
+  /* ===== FOOTER ===== */
+  .footer {
+    margin-top: 24px;
+    padding: 14px 0;
+    border-top: 1px solid var(--border-glow);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-dim);
+    position: relative;
+    z-index: 1;
+  }
+
+  .footer a {
+    color: var(--mech-primary);
+    text-decoration: none;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px;
+    letter-spacing: 1px;
+  }
+
+  .footer a:hover { text-shadow: 0 0 8px var(--mech-primary); }
+
+  /* ===== 自动下单面板 ===== */
+  .auto-trade-panel {
+    margin-top: 18px;
+    border: 1px solid rgba(123,47,255,0.4);
+    background: linear-gradient(135deg, rgba(13,31,60,0.95), rgba(20,10,40,0.95));
+    box-shadow: 0 0 30px rgba(123,47,255,0.15);
+  }
+  .at-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 8px 0;
+    padding: 4px 0;
+  }
+  .at-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+  .at-input {
+    background: var(--bg-input);
+    border: 1px solid var(--border-glow);
+    border-radius: 6px;
+    color: var(--text-primary);
+    padding: 5px 10px;
+    font-size: 13px;
+    font-family: 'Rajdhani', sans-serif;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .at-input:focus { border-color: var(--mech-accent); }
+  .at-select {
+    background: var(--bg-input);
+    border: 1px solid var(--border-glow);
+    border-radius: 6px;
+    color: var(--text-primary);
+    padding: 5px 10px;
+    font-size: 13px;
+    outline: none;
+  }
+  .at-mode-btn {
+    background: transparent;
+    border: 1px solid var(--border-glow);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    padding: 5px 18px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'Rajdhani', sans-serif;
+  }
+  .at-mode-btn.active {
+    background: rgba(123,47,255,0.25);
+    border-color: var(--mech-accent);
+    color: var(--mech-accent);
+    box-shadow: 0 0 10px rgba(123,47,255,0.3);
+  }
+  .at-mode-btn:hover:not(.active) { border-color: var(--mech-primary); color: var(--mech-primary); }
+  #atPlanTbody td {
+    padding: 3px 10px;
+    border-bottom: 1px solid rgba(0,212,255,0.1);
+    color: var(--text-secondary);
+  }
+  #atPlanTbody td:first-child { color: var(--mech-primary); font-weight: bold; }
+  #atPlanTbody td:last-child { color: var(--mech-green); }
+
+  /* Animations */
+  @keyframes flicker {
+    0%, 95%, 100% { opacity: 1; }
+    96% { opacity: 0.8; }
+    97% { opacity: 1; }
+    98% { opacity: 0.6; }
+    99% { opacity: 1; }
+  }
+
+  .neon-text { animation: flicker 8s infinite; }
+
+  /* Mobile */
+  @media (max-width: 1100px) {
+    .main-layout { grid-template-columns: 1fr; }
+    .right-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  }
+
+  @media (max-width: 640px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .right-col { grid-template-columns: 1fr; }
+    .orders-grid { grid-template-columns: 1fr; }
+    .signal-bar { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  /* Corner decorations */
+  .corner-deco {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-color: var(--mech-primary);
+    border-style: solid;
+    opacity: 0.6;
+  }
+  .corner-tl { top: 0; left: 0; border-width: 2px 0 0 2px; }
+  .corner-tr { top: 0; right: 0; border-width: 2px 2px 0 0; }
+  .corner-bl { bottom: 0; left: 0; border-width: 0 0 2px 2px; }
+  .corner-br { bottom: 0; right: 0; border-width: 0 2px 2px 0; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="24,2 44,12 44,36 24,46 4,36 4,12" fill="none" stroke="#00d4ff" stroke-width="1.5" opacity="0.5"/>
+          <polygon points="24,6 40,14 40,34 24,42 8,34 8,14" fill="rgba(0,212,255,0.08)"/>
+          <path d="M18 16h8a6 6 0 010 12H18V16z" fill="none" stroke="#00d4ff" stroke-width="2"/>
+          <path d="M18 28h10a6 6 0 010 12H18V28z" fill="none" stroke="#7b2fff" stroke-width="2"/>
+          <line x1="14" y1="20" x2="18" y2="20" stroke="#00ff88" stroke-width="2"/>
+          <line x1="14" y1="34" x2="18" y2="34" stroke="#00ff88" stroke-width="2"/>
+        </svg>
+      </div>
+      <div class="logo-text">
+        <h1 class="neon-text">复利引擎</h1>
+        <p>Compound Engine · BTC Intelligence</p>
+      </div>
+    </div>
+
+    <div class="header-status">
+      <div class="price-display">
+        <div class="price" id="headerPrice">-- --</div>
+        <div class="change up" id="headerChange">加载中...</div>
+      </div>
+      <div>
+        <div class="status-dot" id="connStatusWrap">
+          <div class="dot waiting" id="connDot"></div>
+          <span id="connText">连接中</span>
+        </div>
+        <div style="font-size:11px; color:var(--text-dim); margin-top:4px;" id="systemPhase">WARMING UP</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN LAYOUT -->
+  <div class="main-layout">
+
+    <!-- LEFT COLUMN -->
+    <div class="left-col">
+
+      <!-- K线图 -->
+      <div class="panel clip-tl" style="padding:0;">
+        <div class="panel-title">
+          实时 K线
+          <div class="timeframe-btns" style="margin-left:auto;">
+            <button class="tf-btn active" onclick="switchTF('1m')">1m</button>
+            <button class="tf-btn" onclick="switchTF('5m')">5m</button>
+            <button class="tf-btn" onclick="switchTF('15m')">15m</button>
+            <button class="tf-btn" onclick="switchTF('1h')">1H</button>
+          </div>
+        </div>
+        <div id="chartContainer"></div>
+      </div>
+
+      <!-- 信号强度 -->
+      <div class="panel signal-bar">
+        <div class="signal-item">
+          <div class="label">神经网络</div>
+          <div class="value" id="sig0" style="color:var(--mech-primary)">--</div>
+          <div class="bar"><div class="bar-fill" id="sig0bar" style="width:0%;background:var(--mech-primary)"></div></div>
+        </div>
+        <div class="signal-item">
+          <div class="label">LSTM</div>
+          <div class="value" id="sig1" style="color:var(--mech-secondary)">--</div>
+          <div class="bar"><div class="bar-fill" id="sig1bar" style="width:0%;background:var(--mech-secondary)"></div></div>
+        </div>
+        <div class="signal-item">
+          <div class="label">技术分析</div>
+          <div class="value" id="sig2" style="color:var(--mech-yellow)">--</div>
+          <div class="bar"><div class="bar-fill" id="sig2bar" style="width:0%;background:var(--mech-yellow)"></div></div>
+        </div>
+        <div class="signal-item">
+          <div class="label">情绪模型</div>
+          <div class="value" id="sig3" style="color:var(--mech-accent)">--</div>
+          <div class="bar"><div class="bar-fill" id="sig3bar" style="width:0%;background:var(--mech-accent)"></div></div>
+        </div>
+        <div class="signal-item">
+          <div class="label">XGBoost</div>
+          <div class="value" id="sig4" style="color:#ff9f0a">--</div>
+          <div class="bar"><div class="bar-fill" id="sig4bar" style="width:0%;background:#ff9f0a"></div></div>
+        </div>
+      </div>
+
+      <!-- 统计 -->
+      <div class="panel">
+        <div class="panel-title">交易统计</div>
+        <div class="stats-grid">
+          <div class="stat-block stat-total" style="color:var(--mech-primary)">
+            <div class="stat-label">总单数</div>
+            <div class="stat-value" id="statTotal">0</div>
+            <div class="stat-sub">累计下单</div>
+          </div>
+          <div class="stat-block stat-win">
+            <div class="stat-label">赢单</div>
+            <div class="stat-value" id="statWin">0</div>
+            <div class="stat-sub" id="statWinRate">胜率 --%</div>
+          </div>
+          <div class="stat-block stat-lose">
+            <div class="stat-label">输单</div>
+            <div class="stat-value" id="statLose">0</div>
+            <div class="stat-sub" id="statLoseRate">败率 --%</div>
+          </div>
+          <div class="stat-block stat-rate">
+            <div class="stat-label">胜率</div>
+            <div class="stat-value" id="statRate">--%</div>
+            <div class="stat-sub">实时计算</div>
+          </div>
+          <div class="stat-block stat-streak">
+            <div class="stat-label">当前连胜</div>
+            <div class="stat-value" id="statStreak">0</div>
+            <div class="stat-sub" id="statMaxStreak">最高 0</div>
+          </div>
+          <div class="stat-block stat-profit">
+            <div class="stat-label">实时胜率</div>
+            <div class="stat-value" id="statProfit">--%</div>
+            <div class="stat-sub" id="statProfitRate">实时计算</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 活跃订单 -->
+      <div class="panel">
+        <div class="panel-title">当前活跃订单</div>
+        <div class="orders-grid">
+          <div class="order-slot empty" id="slot0">
+            <div>
+              <div style="font-size:20px;margin-bottom:4px;opacity:0.3">⬡</div>
+              <div>SLOT 1 · 等待信号</div>
+            </div>
+          </div>
+          <div class="order-slot empty" id="slot1">
+            <div>
+              <div style="font-size:20px;margin-bottom:4px;opacity:0.3">⬡</div>
+              <div>SLOT 2 · 等待信号</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 历史记录 -->
+      <div class="panel history-section">
+        <div class="panel-title">历史开单记录</div>
+        <div class="history-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>方向</th>
+                <th>开单价</th>
+                <th>结算价</th>
+                <th>结果</th>
+                <th>置信度</th>
+                <th>开单时间</th>
+                <th>结算时间</th>
+              </tr>
+            </thead>
+            <tbody id="historyTbody">
+              <tr>
+                <td colspan="8" style="text-align:center;color:var(--text-dim);padding:24px;">
+                  暂无交易记录
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div class="right-col">
+
+      <!-- 信号仪表 -->
+      <div class="panel clip-tr">
+        <div class="panel-title">综合信号</div>
+        <div class="confidence-display">
+          <div class="conf-ring">
+            <svg viewBox="0 0 100 100" width="100" height="100">
+              <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(0,212,255,0.1)" stroke-width="8"/>
+              <circle cx="50" cy="50" r="42" fill="none" stroke="url(#confGrad)" stroke-width="8"
+                stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="264"
+                id="confCircle" style="transition:stroke-dashoffset 0.5s ease"/>
+              <defs>
+                <linearGradient id="confGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" style="stop-color:var(--mech-accent)"/>
+                  <stop offset="100%" style="stop-color:var(--mech-primary)"/>
+                </linearGradient>
+              </defs>
+            </svg>
+            <div class="conf-ring-text">
+              <div class="conf-num" id="confNum">0%</div>
+              <div class="conf-sub">CONF</div>
+            </div>
+          </div>
+          <div class="signal-label signal-wait" id="signalLabel">WARMING UP</div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:4px;" id="signalSub">等待数据预热...</div>
+        </div>
+      </div>
+
+      <!-- 控制面板 -->
+      <div class="panel clip-tr">
+        <div class="panel-title">引擎控制</div>
+        <div class="control-panel">
+          <div class="ctrl-section">
+            <div class="ctrl-label">周期时间</div>
+            <select class="ctrl-select" id="inputTF">
+              <option value="5" selected>5 分钟</option>
+              <option value="10">10 分钟</option>
+              <option value="30">30 分钟</option>
+            </select>
+          </div>
+          <div class="ctrl-section">
+            <div class="ctrl-label">最大并单数</div>
+            <div class="ctrl-range-row">
+              <span style="font-size:12px;color:var(--text-dim)">1</span>
+              <input class="ctrl-range" type="range" id="inputMaxOrders" min="1" max="2" value="1"
+                oninput="document.getElementById('maxOrdersVal').textContent=this.value">
+              <span style="font-size:12px;color:var(--text-dim)">2</span>
+              <span class="ctrl-range-val" id="maxOrdersVal">1</span>
+            </div>
+          </div>
+          <div class="ctrl-section">
+            <div class="ctrl-label">置信度阈值</div>
+            <div class="ctrl-range-row">
+              <span style="font-size:12px;color:var(--text-dim)">60%</span>
+              <input class="ctrl-range" type="range" id="inputConfThreshold" min="60" max="90" value="70"
+                oninput="document.getElementById('confThreshVal').textContent=this.value+'%'">
+              <span style="font-size:12px;color:var(--text-dim)">90%</span>
+              <span class="ctrl-range-val" id="confThreshVal">70%</span>
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button class="mech-btn btn-start" id="btnStart" onclick="startEngine()">▶ 启动</button>
+            <button class="mech-btn btn-stop" id="btnStop" onclick="stopEngine()" disabled>■ 停止</button>
+            <button class="mech-btn btn-train" id="btnTrain" onclick="trainModel()">⚡ 训练模型</button>
+            <button class="mech-btn btn-export" onclick="exportHistory()">↓ 导出历史记录</button>
+            <button class="mech-btn" id="btnAutoTrade" onclick="atTogglePanel()" style="background:rgba(123,47,255,0.15);border-color:var(--mech-accent);color:var(--mech-accent)">🤖 自动下单</button>
+          </div>
+
+          <div class="train-progress" id="trainProgress">
+            <div class="progress-label">
+              <span>模型训练中</span>
+              <span id="trainPct">0%</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" id="trainFill" style="width:0%"></div>
+            </div>
+            <div style="font-size:10px;color:var(--text-dim);margin-top:4px;" id="trainStatus">初始化...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 模型详情 -->
+      <div class="panel">
+        <div class="panel-title">模型权重</div>
+        <div class="model-signals">
+          <div class="model-row">
+            <div class="model-name">神经网络</div>
+            <div class="model-bar-wrap">
+              <div class="model-bar-fill" id="mb0" style="width:0%;background:var(--mech-primary)">
+                <span class="model-bar-val" id="mv0">--</span>
+              </div>
+            </div>
+            <div class="model-dir dir-neutral" id="md0">-</div>
+          </div>
+          <div class="model-row">
+            <div class="model-name">LSTM</div>
+            <div class="model-bar-wrap">
+              <div class="model-bar-fill" id="mb1" style="width:0%;background:var(--mech-secondary)">
+                <span class="model-bar-val" id="mv1">--</span>
+              </div>
+            </div>
+            <div class="model-dir dir-neutral" id="md1">-</div>
+          </div>
+          <div class="model-row">
+            <div class="model-name">技术指标</div>
+            <div class="model-bar-wrap">
+              <div class="model-bar-fill" id="mb2" style="width:0%;background:var(--mech-yellow)">
+                <span class="model-bar-val" id="mv2">--</span>
+              </div>
+            </div>
+            <div class="model-dir dir-neutral" id="md2">-</div>
+          </div>
+          <div class="model-row">
+            <div class="model-name">情绪分析</div>
+            <div class="model-bar-wrap">
+              <div class="model-bar-fill" id="mb3" style="width:0%;background:var(--mech-accent)">
+                <span class="model-bar-val" id="mv3">--</span>
+              </div>
+            </div>
+            <div class="model-dir dir-neutral" id="md3">-</div>
+          </div>
+          <div class="model-row">
+            <div class="model-name">XGBoost</div>
+            <div class="model-bar-wrap">
+              <div class="model-bar-fill" id="mb4" style="width:0%;background:#ff9f0a">
+                <span class="model-bar-val" id="mv4">--</span>
+              </div>
+            </div>
+            <div class="model-dir dir-neutral" id="md4">-</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 胜率曲线 -->
+      <div class="panel">
+        <div class="panel-title">胜率曲线</div>
+        <div class="winrate-panel">
+          <canvas id="winRateChart"></canvas>
+        </div>
+      </div>
+
+      <!-- 系统日志 -->
+      <div class="panel log-panel">
+        <div class="panel-title">系统日志</div>
+        <div class="log-content" id="logContent">
+          <div class="log-line"><span class="log-time">00:00:00</span><span class="log-info">复利引擎 v1.0 已加载</span></div>
+          <div class="log-line"><span class="log-time">00:00:00</span><span class="log-info">等待启动指令...</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== 自动下单面板 ===== -->
+  <div class="panel auto-trade-panel" id="autoTradePanel" style="display:none">
+    <div class="panel-title">⚡ 自动下单控制台
+      <span id="atLicenseBadge" style="margin-left:12px;font-size:11px;padding:2px 8px;border-radius:4px;background:rgba(255,45,85,0.2);color:var(--mech-red)">未激活</span>
+    </div>
+
+    <!-- 激活码区域 -->
+    <div class="at-row" id="atLicenseRow" style="background:rgba(255,45,85,0.05);border:1px solid rgba(255,45,85,0.15);border-radius:8px;padding:10px 14px;margin-bottom:10px">
+      <span style="font-size:12px;color:var(--text-secondary);margin-right:8px">注册码</span>
+      <input type="text" id="atLicenseInput" placeholder="输入注册码激活自动下单" class="at-input" style="width:220px;flex:1">
+      <button class="mech-btn" style="font-size:12px;padding:6px 16px;margin-left:8px" onclick="atVerifyLicense()">激活</button>
+      <span id="atLicenseMsg" style="margin-left:10px;font-size:12px;color:var(--text-secondary)"></span>
+    </div>
+
+    <!-- 设置区（激活后可用，未激活时半透明） -->
+    <div id="atSettingsArea" style="opacity:0.45;pointer-events:none;transition:opacity 0.3s">
+
+      <!-- 平台 & 赔率 -->
+      <div class="at-row" style="margin-bottom:8px">
+        <label class="at-label">平台</label>
+        <select id="atPlatform" class="at-select" onchange="atUpdatePlatform()">
+          <option value="binance">币安（≥5u，整数）</option>
+          <option value="altcoin">山寨所（≥3u，3位小数）</option>
+        </select>
+        <label class="at-label" style="margin-left:18px">赔率</label>
+        <input type="number" id="atPayout" value="0.80" min="0.5" max="1" step="0.01" class="at-input" style="width:80px">
+        <span class="at-label">（默认80%）</span>
+      </div>
+
+      <!-- 下单模式切换 -->
+      <div class="at-row" style="margin-bottom:8px">
+        <label class="at-label">模式</label>
+        <button class="at-mode-btn active" id="atModeNormal" onclick="atSetMode('normal')">普通</button>
+        <button class="at-mode-btn" id="atModeCompound" onclick="atSetMode('compound')">复利</button>
+      </div>
+
+      <!-- 普通模式 -->
+      <div id="atNormalPanel">
+        <div class="at-row">
+          <label class="at-label">下注金额</label>
+          <input type="number" id="atNormalAmount" value="10" min="3" step="1" class="at-input" style="width:100px">
+          <span class="at-label" id="atAmountHint">（币安最低5u，整数）</span>
+        </div>
+        <div class="at-row" style="margin-top:8px;align-items:center;gap:8px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-secondary);user-select:none">
+            <input type="checkbox" id="atNormalAutoCheck" onchange="atToggleNormalAuto(this.checked)"
+              style="width:15px;height:15px;accent-color:var(--mech-primary);cursor:pointer">
+            <span>启用自动下单（每根K线结算后自动执行）</span>
+          </label>
+          <span id="atNormalAutoHint" style="font-size:11px;color:var(--mech-green);display:none">✅ 已启用</span>
+        </div>
+      </div>
+
+      <!-- 复利模式 -->
+      <div id="atCompoundPanel" style="display:none">
+        <div class="at-row">
+          <label class="at-label">初始金额</label>
+          <input type="number" id="atInitial" value="10" min="3" step="1" class="at-input" style="width:100px">
+          <label class="at-label" style="margin-left:18px">复利次数</label>
+          <input type="number" id="atRounds" value="3" min="1" max="10" step="1" class="at-input" style="width:60px">
+          <span class="at-label">次（最多10次）</span>
+          <button class="mech-btn" style="font-size:11px;padding:5px 12px;margin-left:12px" onclick="atPreviewPlan()">预览计划</button>
+        </div>
+
+        <!-- 复利计划预览表 -->
+        <div id="atPlanTable" style="display:none;margin:10px 0 4px;background:var(--bg-input);border-radius:8px;padding:10px;font-size:12px">
+          <div style="color:var(--text-secondary);margin-bottom:6px">复利计划（连赢才能达成）：</div>
+          <table id="atPlanTbody" style="width:100%;border-collapse:collapse"></table>
+          <div id="atPlanSummary" style="margin-top:6px;color:var(--mech-green);font-weight:bold"></div>
+        </div>
+        <!-- 自动下单勾选 -->
+        <div class="at-row" style="margin-top:8px;align-items:center;gap:8px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-secondary);user-select:none">
+            <input type="checkbox" id="atCompoundAutoCheck" onchange="atToggleCompoundAuto(this.checked)"
+              style="width:15px;height:15px;accent-color:var(--mech-primary);cursor:pointer">
+            <span>启用自动下单（每根K线结算后自动执行）</span>
+          </label>
+          <span id="atCompoundAutoHint" style="font-size:11px;color:var(--mech-green);display:none">✅ 已启用</span>
+        </div>
+
+        <!-- 本轮结果上报 -->
+        <div id="atResultRow" style="display:none" class="at-row">
+          <span class="at-label">本轮结果：</span>
+          <button class="mech-btn" style="background:rgba(0,255,136,0.15);border-color:var(--mech-green);color:var(--mech-green);padding:8px 22px;font-size:14px" onclick="atReportResult('win')">✅ 赢了</button>
+          <button class="mech-btn" style="background:rgba(255,45,85,0.15);border-color:var(--mech-red);color:var(--mech-red);padding:8px 22px;font-size:14px;margin-left:10px" onclick="atReportResult('loss')">❌ 输了</button>
+          <span id="atResultHint" style="margin-left:12px;font-size:12px;color:var(--text-secondary)"></span>
+        </div>
+      </div>
+
+      <!-- 坐标标定 -->
+      <div class="at-row" style="margin-top:10px">
+        <button class="mech-btn" style="font-size:11px;padding:5px 12px;background:rgba(123,47,255,0.15);border-color:var(--mech-accent);color:var(--mech-accent)" onclick="atShowCoords()">📍 坐标标定</button>
+        <span id="atCoordsStatus" style="margin-left:10px;font-size:12px;color:var(--text-secondary)">未标定</span>
+      </div>
+
+      <!-- 坐标标定面板 -->
+      <div id="atCoordsPanel" style="display:none;margin:10px 0;background:var(--bg-input);border-radius:8px;padding:14px;font-size:12px">
+
+        <!-- 逐步引导区域 -->
+        <div id="calibrateGuide" style="display:none">
+          <div style="margin-bottom:10px;color:var(--mech-primary);font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:1px">🖱 坐标引导标定</div>
+          <div id="calibrateStepDesc" style="color:#fff;margin-bottom:4px;font-size:13px;font-weight:bold"></div>
+          <div id="calibrateStepHint" style="color:var(--text-secondary);margin-bottom:10px;font-size:11px"></div>
+          <!-- 鼠标位置 + 倒计时 -->
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:14px">
+            <div style="background:rgba(0,212,255,0.06);border:1px solid rgba(0,212,255,0.2);border-radius:8px;padding:10px 18px;text-align:center;min-width:140px">
+              <div style="color:var(--text-secondary);font-size:10px;margin-bottom:4px;letter-spacing:1px">当前鼠标位置</div>
+              <div id="calibrateLivePos" style="font-family:'Orbitron',sans-serif;font-size:18px;color:var(--mech-yellow);font-weight:bold;min-width:120px">— , —</div>
+            </div>
+            <!-- 倒计时圆环 -->
+            <div style="position:relative;width:56px;height:56px;flex-shrink:0;display:none" id="calibrateRingWrap">
+              <svg width="56" height="56" style="transform:rotate(-90deg)">
+                <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(0,212,255,0.15)" stroke-width="4"/>
+                <circle id="calibrateRing" cx="28" cy="28" r="22" fill="none" stroke="var(--mech-primary)" stroke-width="4"
+                  stroke-dasharray="138.2" stroke-dashoffset="0" style="transition:stroke-dashoffset 0.2s linear"/>
+              </svg>
+              <div id="calibrateCountdown" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-family:'Orbitron',sans-serif;font-size:16px;color:var(--mech-primary);font-weight:bold">5</div>
+            </div>
+            <div style="font-size:11px;color:var(--text-secondary);line-height:1.7">
+              将鼠标移到目标位置<br><span style="color:var(--mech-green)">悬停5秒自动录入</span>，然后到面板确认
+            </div>
+          </div>
+          <!-- 已录入提示 -->
+          <div id="calibrateCaptured" style="display:none;background:rgba(0,255,136,0.1);border:1px solid rgba(0,255,136,0.3);border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:11px;color:var(--mech-green)">
+            ✅ 已自动录入坐标：<span id="calibrateCapturedPos" style="font-family:'Orbitron',sans-serif;margin-left:4px"></span>
+          </div>
+          <!-- 操作按钮 -->
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="mech-btn" id="calibrateConfirmBtn"
+              style="font-size:12px;padding:8px 22px;background:rgba(0,255,136,0.15);border-color:var(--mech-green);color:var(--mech-green);font-weight:bold"
+              onclick="atCalibrateConfirm()" disabled>✔ 确认此坐标</button>
+            <button class="mech-btn" id="calibrateCancelBtn"
+              style="font-size:11px;padding:6px 14px;background:rgba(255,45,85,0.1);border-color:var(--mech-red);color:var(--mech-red)"
+              onclick="atCalibrateCancel()">✕ 取消</button>
+            <span id="calibrateStepCounter" style="font-size:11px;color:var(--text-secondary);margin-left:4px"></span>
+          </div>
+          <!-- 步骤指示器 -->
+          <div style="display:flex;gap:6px;margin-top:12px" id="calibrateStepDots"></div>
+        </div>
+
+        <!-- 手动输入 + 开始按钮区域（引导中隐藏） -->
+        <div id="calibrateManual">
+          <div style="color:var(--text-secondary);margin-bottom:8px">手动输入坐标，或点「一键标定」逐步引导（鼠标悬停5秒自动记录）：</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div><label class="at-label">金额输入框 X</label><input type="number" id="cAmountX" class="at-input" style="width:80px"> <label class="at-label">Y</label><input type="number" id="cAmountY" class="at-input" style="width:80px"></div>
+            <div><label class="at-label">买涨按钮 X</label><input type="number" id="cUpX" class="at-input" style="width:80px"> <label class="at-label">Y</label><input type="number" id="cUpY" class="at-input" style="width:80px"></div>
+            <div><label class="at-label">买跌按钮 X</label><input type="number" id="cDownX" class="at-input" style="width:80px"> <label class="at-label">Y</label><input type="number" id="cDownY" class="at-input" style="width:80px"></div>
+            <div><label class="at-label">确认按钮 X</label><input type="number" id="cConfX" class="at-input" style="width:80px"> <label class="at-label">Y</label><input type="number" id="cConfY" class="at-input" style="width:80px"></div>
+          </div>
+          <div style="margin-top:8px;display:flex;gap:8px">
+            <button class="mech-btn" style="font-size:11px;padding:5px 12px" onclick="atSaveCoords()">💾 保存坐标</button>
+            <button class="mech-btn" style="font-size:11px;padding:5px 14px;background:rgba(0,212,255,0.12);border-color:var(--mech-primary);color:var(--mech-primary)" onclick="atStartCalibrateGuide()">🖱 一键标定</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 控制区（复利模式按钮） -->
+      <div id="atCompoundControlRow" style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.06);display:none;align-items:center;gap:10px;flex-wrap:wrap">
+        <button class="mech-btn btn-start" id="atBtnStart" onclick="atStart()" style="padding:10px 24px;font-size:13px" disabled>▶ 开始复利</button>
+        <button class="mech-btn btn-stop" id="atBtnStop" onclick="atStop()" style="padding:10px 24px;font-size:13px;display:none" disabled>■ 停止复利</button>
+        <span id="atStatusText" style="font-size:12px;color:var(--text-secondary)">就绪</span>
+      </div>
+      <!-- 联动状态提示（激活后自动开启） -->
+      <div id="atAutoStatus" style="margin-top:8px;font-size:12px;color:var(--mech-green);display:none">
+        🤖 联动模式已启动 — 引擎每根K线结算后自动评估信号下单
+      </div>
+
+    </div><!-- /atSettingsArea -->
+
+    <!-- 下单日志 -->
+    <div id="atLog" style="margin-top:10px;max-height:140px;overflow-y:auto;background:var(--bg-input);border-radius:8px;padding:8px;font-size:11px;color:var(--text-secondary);font-family:monospace;display:none"></div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <span>复利引擎 Compound Engine · BTC 智能交易系统 v1.0</span>
+    <span>By <a href="https://x.com/OxMagic_" target="_blank">@OxMagic_</a> · 仅供学习研究，不构成投资建议</span>
+  </div>
+
+</div>
+
+<!-- ===== JAVASCRIPT ===== -->
+<script>
+// ========== 后端API配置 ==========
+// 本地开发：自动用 localhost:7788；云端部署：HTML和后端同域名，用相对路径
+const API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'http://127.0.0.1:7788/api'
+  : (window._BACKEND_URL ? window._BACKEND_URL + '/api' : '/api');
+let backendAvailable = false;
+
+async function checkBackend() {
+  try {
+    const r = await fetch(API_BASE + '/status', {signal: AbortSignal.timeout(5000)});
+    const d = await r.json();
+    backendAvailable = true;
+    const mc = d.model_count || 0;
+    if (mc === 0) {
+      log('后端已连接，模型加载中…请稍候再启动引擎', 'warn');
+      document.getElementById('systemPhase').textContent = 'LOADING';
+    } else {
+      log(`后端已连接，${mc} 个真实模型已加载`, 'success');
+      document.getElementById('systemPhase').textContent = 'REAL MODEL';
+    }
+    return d;
+  } catch(e) {
+    backendAvailable = false;
+    log('后端未启动，使用本地TA模型（运行 compound_engine_server.py 可启用真实预测）', 'warn');
+    return null;
+  }
+}
+
+// ========== STATE ==========
+const STATE = {
+  running: false,
+  trained: false,
+  warmupDone: false,
+  warmupRound: 0,
+  currentTF: '1m',
+  currentPrice: 0,
+  priceChange: 0,
+  candles: [],
+  lastSignal: null,     // 供自动下单复利模块使用：'up'/'down'
+  wsKline: null,
+  wsTicker: null,
+  orders: [null, null],
+  history: [],
+  stats: { total: 0, win: 0, lose: 0, streak: 0, maxStreak: 0, profit: 0 },
+  consecutiveLoss: 0,   // 连败计数
+  retraining: false,    // 正在重训标志
+  predicting: false,    // 预测重入锁，防止并发重复开单
+  winRateHistory: [],
+  models: {
+    ml:   { score: 50, dir: 0 },
+    boost:{ score: 50, dir: 0 },
+    deep: { score: 50, dir: 0 },
+    stat: { score: 50, dir: 0 },
+    knn:  { score: 50, dir: 0 },
+  },
+  checkInterval: null,
+  pollInterval: null,
+  restPredictTimer: null,
+  slotTickTimer: null,
+  // 开单冷却控制
+  lastOrderKlineTime: 0,    // 上次开单时的K线时间戳（每根K线只允许开一次）
+  lastOrderDir: null,       // 上次开单方向 'UP'|'DOWN'，防连续同向
+  sameDirectionCount: 0,    // 连续同向开单计数（超过N次要求更高置信度）
+};
+
+// ========== CHART ==========
+let chart, candleSeries, longMarkers = [], shortMarkers = [];
+function initChart() {
+  const container = document.getElementById('chartContainer');
+  chart = LightweightCharts.createChart(container, {
+    width: container.clientWidth,
+    height: 380,
+    layout: { background: { color: '#060d1a' }, textColor: '#7aa8cc' },
+    grid: {
+      vertLines: { color: 'rgba(0,212,255,0.06)' },
+      horzLines: { color: 'rgba(0,212,255,0.06)' },
+    },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    rightPriceScale: { borderColor: 'rgba(0,212,255,0.2)' },
+    timeScale: { borderColor: 'rgba(0,212,255,0.2)', timeVisible: true },
+  });
+  candleSeries = chart.addCandlestickSeries({
+    upColor: '#00ff88', downColor: '#ff2d55',
+    borderUpColor: '#00ff88', borderDownColor: '#ff2d55',
+    wickUpColor: '#00ff88', wickDownColor: '#ff2d55',
+  });
+  window.addEventListener('resize', () => {
+    chart.applyOptions({ width: container.clientWidth });
+  });
+}
+
+function addChartCandle(c) {
+  if (!candleSeries) return;
+  try {
+    candleSeries.update({ time: Math.floor(c.time/1000), open: +c.open, high: +c.high, low: +c.low, close: +c.close });
+  } catch(e) { /* 忽略单根更新错误 */ }
+}
+
+function loadChartHistory(candles) {
+  if (!candleSeries || !candles.length) return;
+  // lightweight-charts要求时间严格递增，去重+排序
+  const seen = new Set();
+  const data = candles
+    .map(c => ({ time: Math.floor(c.time/1000), open: +c.open, high: +c.high, low: +c.low, close: +c.close }))
+    .filter(c => { if (seen.has(c.time)) return false; seen.add(c.time); return true; })
+    .sort((a, b) => a.time - b.time);
+  if (!data.length) return;
+  try {
+    candleSeries.setData(data);
+    log(`图表渲染完成 ${data.length}根K线`, 'success');
+  } catch(e) {
+    log(`图表渲染失败: ${e.message}`, 'error');
+  }
+}
+
+// ========== PRICE DISPLAY ==========
+function updatePriceDisplay(price, change) {
+  const priceEl = document.getElementById('headerPrice');
+  const pct = document.getElementById('headerChange');
+  if (!priceEl || !pct) return;
+  priceEl.textContent = price.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  pct.textContent = (change >= 0 ? '+' : '') + change.toFixed(2) + '%';
+  pct.className = 'change ' + (change >= 0 ? 'up' : 'down');
+}
+
+// ========== LOG ==========
+function log(msg, type='info') {
+  const box = document.getElementById('logContent');
+  if (!box) return;
+  const t = new Date().toTimeString().slice(0,8);
+  const div = document.createElement('div');
+  div.className = 'log-line';
+  div.innerHTML = `<span class="log-time">${t}</span><span class="log-${type}">${msg}</span>`;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+  if (box.children.length > 80) box.removeChild(box.firstChild);
+}
+
+// ========== STATS UPDATE ==========
+function updateStats() {
+  const s = STATE.stats;
+  document.getElementById('statTotal').textContent = s.total;
+  document.getElementById('statWin').textContent = s.win;
+  document.getElementById('statLose').textContent = s.lose;
+
+  const wrPct  = s.total > 0 ? s.win  / s.total * 100 : null;
+  const lrPct  = s.total > 0 ? s.lose / s.total * 100 : null;
+  const wrText = wrPct !== null ? wrPct.toFixed(1) + '%' : '--%';
+  const lrText = lrPct !== null ? lrPct.toFixed(1) + '%' : '--%';
+
+  // 赢单卡片小字
+  document.getElementById('statWinRate').textContent = wrPct !== null ? wrPct.toFixed(1) + '%' : '--%';
+  // 输单卡片小字
+  const loseRateEl = document.getElementById('statLoseRate');
+  if (loseRateEl) loseRateEl.textContent = '败率 ' + lrText;
+  // 胜率大卡片
+  const rateEl = document.getElementById('statRate');
+  if (rateEl) {
+    rateEl.textContent = wrText;
+    rateEl.style.color = wrPct === null ? 'var(--mech-yellow)'
+      : wrPct >= 50 ? 'var(--mech-green)' : 'var(--mech-red)';
+  }
+
+  // 连胜/连败
+  const streakEl = document.getElementById('statStreak');
+  if (streakEl) {
+    streakEl.textContent = s.streak >= 0 ? s.streak + '连胜' : Math.abs(s.streak) + '连败';
+    streakEl.style.color = s.streak >= 0 ? 'var(--mech-green)' : 'var(--mech-red)';
+  }
+  const maxStreakEl = document.getElementById('statMaxStreak');
+  if (maxStreakEl) maxStreakEl.textContent = '最高 ' + s.maxStreak;
+
+  // 实时胜率卡片
+  const profitEl = document.getElementById('statProfit');
+  if (profitEl) {
+    profitEl.textContent = wrText;
+    profitEl.style.color = wrPct === null ? 'var(--mech-yellow)'
+      : wrPct >= 50 ? 'var(--mech-green)' : 'var(--mech-red)';
+  }
+}
+
+// ========== MODEL GAUGES ==========
+function updateModelGauges(groupConfs) {
+  // 顺序对应HTML里mb0~mb4
+  const keys = ['ml', 'boost', 'deep', 'stat', 'knn'];
+  keys.forEach((key, i) => {
+    const pct = groupConfs ? (groupConfs[key] ?? 50) : 50;
+    const bar = document.getElementById('mb' + i);
+    const val = document.getElementById('mv' + i);
+    const dir = document.getElementById('md' + i);
+    if (bar) {
+      bar.style.width = Math.min(100, pct) + '%';
+      bar.style.opacity = '1'; // 清除loading状态
+    }
+    if (val) val.textContent = pct.toFixed(0) + '%';
+    if (dir) {
+      const isUp = pct > 50;
+      dir.textContent = isUp ? '▲' : '▼';
+      dir.className = 'model-dir ' + (isUp ? 'dir-up' : 'dir-down');
+    }
+  });
+}
+
+// ========== WIN RATE CHART ==========
+function drawWinRateChart() {
+  const canvas = document.getElementById('winRateChart');
+  if (!canvas) return;
+  const data = STATE.winRateHistory;
+  if (!data.length) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.parentElement.clientWidth - 24;
+  const h = 120;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, w, h);
+
+  // 背景网格
+  ctx.strokeStyle = 'rgba(0,212,255,0.08)';
+  ctx.lineWidth = 1;
+  [0.25, 0.5, 0.75].forEach(y => {
+    const py = h - y * h;
+    ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(w, py); ctx.stroke();
+  });
+
+  // 50% 基准线
+  ctx.strokeStyle = 'rgba(255,210,0,0.3)';
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(0, h/2); ctx.lineTo(w, h/2); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // 曲线
+  const step = w / Math.max(data.length - 1, 1);
+  const latestWr = data[data.length - 1];
+  const lineColor = latestWr >= 0.5 ? '#00ff88' : '#ff2d55';
+
+  // 渐变填充
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, latestWr >= 0.5 ? 'rgba(0,255,136,0.25)' : 'rgba(255,45,85,0.25)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+  ctx.beginPath();
+  data.forEach((v, i) => {
+    const x = i * step;
+    const y = h - v * h;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.lineTo((data.length - 1) * step, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  ctx.beginPath();
+  data.forEach((v, i) => {
+    const x = i * step;
+    const y = h - v * h;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // 当前胜率标注
+  ctx.fillStyle = lineColor;
+  ctx.font = 'bold 13px Orbitron, monospace';
+  ctx.fillText((latestWr * 100).toFixed(1) + '%', w - 50, 18);
+}
+
+
+function updateConfRing(conf) {
+  const circle = document.getElementById('confCircle');
+  const num = document.getElementById('confNum');
+  const sub = document.getElementById('confSub');
+  if (!circle || !num) return;
+  const pct = Math.round(conf * 100);
+  const circumference = 2 * Math.PI * 42;
+  const offset = circumference * (1 - conf);
+  circle.style.strokeDashoffset = offset;
+  num.textContent = pct + '%';
+  if (sub) sub.textContent = conf >= 0.65 ? '置信度充足' : '置信度不足';
+}
+
+// ========== SIGNAL DISPLAY ==========
+function updateSignal(pred, conf) {
+  const label = document.getElementById('signalLabel');
+  const sub = document.getElementById('signalSub');
+  if (!label) return;
+  if (pred === 1) {
+    label.className = 'signal-label signal-up';
+    label.textContent = '▲  LONG';
+    if (sub) sub.textContent = `置信度 ${(conf*100).toFixed(1)}% · 看涨信号`;
+  } else if (pred === 0) {
+    label.className = 'signal-label signal-down';
+    label.textContent = '▼  SHORT';
+    if (sub) sub.textContent = `置信度 ${(conf*100).toFixed(1)}% · 看跌信号`;
+  } else {
+    label.className = 'signal-label signal-wait';
+    label.textContent = '◆  WAIT';
+    if (sub) sub.textContent = '等待信号中...';
+  }
+}
+
+// ========== SLOT 管理 ==========
+function openSlot(slotIdx, pred, conf, price) {
+  const amount = parseFloat(document.getElementById('inputAmount')?.value || 10);
+  const tf = parseInt(document.getElementById('inputTF')?.value || 5);
+  const direction = pred === 1 ? 'UP' : 'DOWN';
+  const now = new Date();
+  STATE.orders[slotIdx] = {
+    direction, conf, entryPrice: price, amount,
+    openTime: now, tfMin: tf,
+    closeTime: new Date(now.getTime() + tf * 60 * 1000),
+  };
+
+  // 更新开单冷却状态
+  const klineTime = STATE.candles.length > 0 ? STATE.candles[STATE.candles.length - 1].time : 0;
+  STATE.lastOrderKlineTime = klineTime;
+  if (STATE.lastOrderDir === direction) {
+    STATE.sameDirectionCount++;
+  } else {
+    STATE.lastOrderDir = direction;
+    STATE.sameDirectionCount = 1;
+  }
+
+  renderSlot(slotIdx);
+  log(`SLOT ${slotIdx+1} 开单: ${direction} | 价格 ${price.toFixed(2)} | ${tf}分钟`, 'success');
+}
+
+function renderSlot(idx) {
+  const el = document.getElementById(`slot${idx}`);
+  if (!el) return;
+  const o = STATE.orders[idx];
+  if (!o) {
+    el.className = 'order-slot empty';
+    el.innerHTML = `<div><div style="font-size:20px;margin-bottom:4px;opacity:0.3">⬡</div><div>SLOT ${idx+1} · 等待信号</div></div>`;
+    return;
+  }
+  const isUp = o.direction === 'UP';
+  el.className = 'order-slot ' + (isUp ? 'slot-long' : 'slot-short');
+  const timeLeft = Math.max(0, Math.floor((o.closeTime - new Date()) / 1000));
+  const mins = Math.floor(timeLeft / 60);
+  const secs = timeLeft % 60;
+  const fmt = d => d.toTimeString().slice(0,8);
+  el.innerHTML = `
+    <div class="slot-badge ${isUp ? 'badge-long' : 'badge-short'}">${isUp ? '▲ 买涨 LONG' : '▼ 买跌 SHORT'}</div>
+    <div class="slot-price">$${o.entryPrice.toFixed(2)}</div>
+    <div class="slot-meta">信心 ${(o.conf*100).toFixed(0)}% · ${o.tfMin}分钟周期</div>
+    <div class="slot-timer">${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}</div>
+    <div class="slot-times">开单 ${fmt(o.openTime)} · 结算 ${fmt(o.closeTime)}</div>
+  `;
+}
+
+function updateSlotTimers() {
+  for (let i = 0; i < 2; i++) {
+    if (STATE.orders[i]) renderSlot(i);
+  }
+}
+
+// ========== 结算 ==========
+async function settleSlot(slotIdx) {
+  const o = STATE.orders[slotIdx];
+  if (!o) return;
+  
+  let closePrice = STATE.currentPrice;
+  if (backendAvailable) {
+    try {
+      const r = await fetch(API_BASE + '/price');
+      const d = await r.json();
+      if (d.price) closePrice = d.price;
+    } catch(e) {}
+  }
+  
+  const isUp = o.direction === 'UP';
+  const win = (isUp && closePrice > o.entryPrice) || (!isUp && closePrice < o.entryPrice);
+  const pnl = win ? o.amount * 0.85 : -o.amount;
+  
+  STATE.stats.total++;
+  if (win) {
+    STATE.stats.win++;
+    STATE.stats.streak = STATE.stats.streak >= 0 ? STATE.stats.streak + 1 : 1;
+    STATE.consecutiveLoss = 0;
+    log(`SLOT ${slotIdx+1} 结算: WIN +85% | ${o.entryPrice.toFixed(2)} → ${closePrice.toFixed(2)}`, 'success');
+  } else {
+    STATE.stats.lose++;
+    STATE.stats.streak = STATE.stats.streak <= 0 ? STATE.stats.streak - 1 : -1;
+    STATE.consecutiveLoss++;
+    STATE.sameDirectionCount = 0; // 输了就重置同向计数，不再追加限制
+    log(`SLOT ${slotIdx+1} 结算: LOSS | ${o.entryPrice.toFixed(2)} → ${closePrice.toFixed(2)}`, 'error');
+  }
+  STATE.stats.profit += pnl;
+  STATE.stats.maxStreak = Math.max(STATE.stats.maxStreak, STATE.stats.streak);
+  
+  // 历史记录
+  STATE.history.unshift({
+    id: STATE.stats.total,
+    dir: o.direction,
+    entryPrice: o.entryPrice,
+    closePrice,
+    amount: o.amount,
+    win,
+    pnl,
+    conf: o.conf,
+    openTime: o.openTime,
+    closeTime: new Date(),
+  });
+  
+  STATE.orders[slotIdx] = null;
+  renderSlot(slotIdx);
+
+  // 记录胜率历史
+  const wr = STATE.stats.total > 0 ? STATE.stats.win / STATE.stats.total : 0;
+  STATE.winRateHistory.push(wr);
+  if (STATE.winRateHistory.length > 30) STATE.winRateHistory.shift();
+  drawWinRateChart();
+
+  updateStats();
+  renderHistory();
+  
+  // 连败3次：触发重训，不停止
+  if (STATE.consecutiveLoss >= 3 && !STATE.retraining) {
+    STATE.consecutiveLoss = 0;
+    log('连败3次，自动触发模型重训...', 'warn');
+    document.getElementById('systemPhase').textContent = 'RETRAINING';
+    triggerRetrain();
+  }
+
+  // ===== 在线学习：上报结果，更新自适应权重 =====
+  if (backendAvailable) {
+    try {
+      // actualDir: 1=涨方向正确，0=跌方向正确
+      const actualDir = win ? (isUp ? 1 : 0) : (isUp ? 0 : 1);
+      await fetch(API_BASE + '/adaptive/update', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ actual: actualDir })
+      });
+    } catch(e) {}
+  }
+
+  // ===== 自动下单联动：结算后如果已激活，自动触发下一笔 =====
+  if (AT.licensed && !trader_busy) {
+    setTimeout(() => atAutoTrigger(), 1500); // 稍等价格稳定再取信号
+  }
+}
+
+// ========== 重训 ==========
+async function triggerRetrain() {
+  if (STATE.retraining) return;
+  STATE.retraining = true;
+  
+  if (backendAvailable) {
+    try {
+      const trainPeriod = parseInt(document.getElementById('inputTF')?.value || 10);
+      const r = await fetch(API_BASE + '/train', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({period: trainPeriod})
+      });
+      const d = await r.json();
+      log('后端重训已触发，系统继续运行', 'info');
+      // 轮询训练进度
+      const pollId = setInterval(async () => {
+        try {
+          const pr = await fetch(API_BASE + '/train/progress');
+          const pd = await pr.json();
+          document.getElementById('trainFill').style.width = pd.progress + '%';
+          document.getElementById('trainPct').textContent = pd.progress + '%';
+          document.getElementById('trainStatus').textContent = pd.status;
+          document.getElementById('trainProgress').style.display = 'block';
+          if (!pd.training) {
+            clearInterval(pollId);
+            document.getElementById('trainProgress').style.display = 'none';
+            STATE.retraining = false;
+            document.getElementById('systemPhase').textContent = 'ACTIVE';
+            log('模型重训完成，恢复正常运行', 'success');
+          }
+        } catch(e) { clearInterval(pollId); STATE.retraining = false; }
+      }, 2000);
+    } catch(e) {
+      log('后端重训失败，继续使用当前模型', 'warn');
+      STATE.retraining = false;
+    }
+  } else {
+    // 本地模拟重训（动画）
+    log('本地模拟重训（无后端）...', 'warn');
+    document.getElementById('trainProgress').style.display = 'block';
+    let p = 0;
+    const msgs = ['清洗数据...','计算特征...','训练RF...','训练XGB...','训练MLP...','集成投票...','完成'];
+    const intv = setInterval(() => {
+      p += 14;
+      document.getElementById('trainFill').style.width = Math.min(p,100) + '%';
+      document.getElementById('trainPct').textContent = Math.min(p,100) + '%';
+      const mi = Math.floor(p/14);
+      document.getElementById('trainStatus').textContent = msgs[Math.min(mi, msgs.length-1)];
+      if (p >= 98) {
+        clearInterval(intv);
+        setTimeout(() => {
+          document.getElementById('trainProgress').style.display = 'none';
+          STATE.retraining = false;
+          document.getElementById('systemPhase').textContent = 'ACTIVE';
+          log('模拟重训完成', 'success');
+        }, 500);
+      }
+    }, 400);
+  }
+}
+
+// ========== 历史记录渲染 ==========
+function renderHistory() {
+  const tbody = document.getElementById('historyTbody');
+  if (!tbody) return;
+  if (!STATE.history.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-dim);padding:24px;">暂无交易记录</td></tr>';
+    return;
+  }
+  tbody.innerHTML = STATE.history.slice(0, 50).map(h => `
+    <tr>
+      <td>${h.id}</td>
+      <td style="color:${h.dir==='UP'?'var(--mech-green)':'var(--mech-red)'}">${h.dir==='UP'?'▲ 买涨':'▼ 买跌'}</td>
+      <td>${h.entryPrice.toFixed(2)}</td>
+      <td>${h.closePrice.toFixed(2)}</td>
+      <td style="color:${h.win?'var(--mech-green)':'var(--mech-red)'}">${h.win?'✓ WIN':'✗ LOSS'}</td>
+      <td>${(h.conf*100).toFixed(0)}%</td>
+      <td>${h.openTime.toTimeString().slice(0,8)}</td>
+      <td>${h.closeTime.toTimeString().slice(0,8)}</td>
+    </tr>
+  `).join('');
+}
+
+// ========== 核心预测循环 ==========
+async function runPredictionCycle() {
+  if (!STATE.running || STATE.retraining) return;
+  // 防重入：避免WS收线信号和REST定时/初始预测并发，导致同一时刻重复开单
+  if (STATE.predicting) {
+    log('预测中，跳过本次重复触发', 'info');
+    return;
+  }
+  STATE.predicting = true;
+  try {
+  
+  const confThreshold = parseInt(document.getElementById('inputConfThreshold')?.value || 70) / 100;
+  const maxOrders = parseInt(document.getElementById('inputMaxOrders')?.value || 1);
+  
+  let pred = null, conf = 0, groupConfs = null;
+  let againstTrend = false, trendDir = 0;
+  let agreementRate = 0.5;  // 模型一致性
+  
+  if (backendAvailable) {
+    // === 真实模型预测 ===
+    try {
+      const periodVal = parseInt(document.getElementById('inputTF')?.value || 10);
+      const r = await fetch(API_BASE + '/predict?period=' + periodVal, {signal: AbortSignal.timeout(25000)});
+      const d = await r.json();
+      if (!d.error) {
+        pred = d.prediction;
+        conf = d.confidence;
+        groupConfs = d.group_confs;
+        trendDir = d.trend_dir ?? 0;
+        againstTrend = d.against_trend ?? false;
+        agreementRate = d.agreement_rate ?? 0.5;
+        // 同步更新STATE供复利模块获取
+        STATE.lastSignal = pred === 1 ? 'up' : 'down';
+        const nearInt = d.near_integer ? ` [整数位 ${d.key_level}]` : '';
+        const trendEmoji = trendDir === 1 ? '📈' : trendDir === -1 ? '📉' : '➡️';
+        const trendLabel = trendDir === 1 ? '上涨' : trendDir === -1 ? '下跌' : '震荡';
+        const adxVal = d.trend_details?.adx ?? '--';
+        const agreeStr = `一致性${(agreementRate*100).toFixed(0)}%`;
+        log(`[${periodVal}min] 真实预测: ${pred===1?'▲涨':'▼跌'} 置信${(conf*100).toFixed(1)}% ${agreeStr}${nearInt} | ${d.up_votes}↑/${d.down_votes}↓ (${d.total_models}模型)`, 'info');
+        log(`${trendEmoji} 趋势: ${trendLabel} ADX=${adxVal}${againstTrend ? ' ⚠️逆势信号' : ''}`, againstTrend ? 'warn' : 'info');
+      }
+    } catch(e) {
+      log('后端预测超时，本轮使用本地TA备用', 'warn');
+      // 不直接return，fallback到本地TA
+      const ta = computeLocalTA(STATE.candles);
+      pred = ta.dir;
+      conf = ta.score;
+      groupConfs = { ml: ta.score*100, boost: ta.score*100, deep: 50, stat: 50, knn: 50 };
+    }
+  } else {
+    // === 本地TA备用 ===
+    const ta = computeLocalTA(STATE.candles);
+    pred = ta.dir;
+    conf = ta.score;
+    groupConfs = { ml: ta.score*100, boost: ta.score*100, deep: 50, stat: 50, knn: 50 };
+  }
+  
+  updateConfRing(conf);
+  if (groupConfs) updateModelGauges(groupConfs);
+  updateSignal(pred, conf);
+  
+  // 预热期：第一轮只分析信号，不执行开单，第二轮起正式交易
+  if (!STATE.warmupDone) {
+    STATE.warmupDone = true;
+    document.getElementById('systemPhase').textContent = 'ACTIVE';
+    log(`预热轮完成 · 信号: ${pred===1?'▲涨':'▼跌'} 置信${(conf*100).toFixed(1)}% · 下一根K线收线后开始交易`, 'info');
+    return; // 本轮只展示信号，不开单
+  }
+  
+  // 置信度不足，跳过
+  if (conf < confThreshold) {
+    log(`置信度 ${(conf*100).toFixed(1)}% < 阈值 ${(confThreshold*100).toFixed(0)}%，跳过`, 'warn');
+    return;
+  }
+  
+  // 一致性过滤：模型方向一致性不足55%时跳过（信号噪音大）
+  if (agreementRate < 0.55) {
+    log(`⚠️ 模型一致性 ${(agreementRate*100).toFixed(0)}% 不足55%，信号噪音大，跳过`, 'warn');
+    return;
+  }
+  
+  // 逆势过滤：强趋势中逆势信号，置信度折扣后仍低于更高阈值则跳过
+  // （趋势过滤已在后端完成置信度折扣，前端只需判断折扣后是否仍够格）
+  // 额外保护：如果是逆势信号，要求置信度至少高出阈值10%才敢入
+  if (againstTrend && conf < confThreshold + 0.10) {
+    const trendLabel = trendDir === 1 ? '上涨' : '下跌';
+    log(`⚠️ 逆${trendLabel}趋势信号置信${(conf*100).toFixed(1)}%不足，跳过`, 'warn');
+    return;
+  }
+  
+  // 寻找空槽位
+  const freeSlots = STATE.orders.map((o,i) => o === null ? i : -1).filter(i => i >= 0);
+  const usedSlots = STATE.orders.filter(o => o !== null).length;
+  if (usedSlots >= maxOrders || freeSlots.length === 0) {
+    log('槽位已满，等待结算', 'info');
+    return;
+  }
+
+  // ---- 开单冷却控制 ----
+  // 1. 同一根K线只允许开一次（防止 REST 和 WS 双触发）
+  const currentKlineTime = STATE.candles.length > 0
+    ? STATE.candles[STATE.candles.length - 1].time : 0;
+  if (currentKlineTime > 0 && currentKlineTime === STATE.lastOrderKlineTime) {
+    log('同根K线已开单，冷却等下一根', 'info');
+    return;
+  }
+
+  // 2. 连续同向超过2次时，要求更高置信度（+8%）才允许开单
+  const thisDir = pred === 1 ? 'UP' : 'DOWN';
+  if (STATE.lastOrderDir === thisDir && STATE.sameDirectionCount >= 2) {
+    const extraThresh = confThreshold + 0.08;
+    if (conf < extraThresh) {
+      log(`连续${STATE.sameDirectionCount}次${thisDir}方向，置信${(conf*100).toFixed(1)}% < ${(extraThresh*100).toFixed(0)}%，跳过`, 'warn');
+      return;
+    }
+  }
+
+  // 3. 连败3次后，本根K线强制跳过（消化一根再说）
+  if (STATE.consecutiveLoss >= 3 && STATE.lastOrderKlineTime > 0 && currentKlineTime === STATE.lastOrderKlineTime + 1) {
+    log('⚠️ 连败3次，跳过此根K线冷静一下', 'warn');
+    return;
+  }
+
+  // 开单
+  const slotIdx = freeSlots[0];
+  openSlot(slotIdx, pred, conf, STATE.currentPrice);
+  
+  // 定时结算
+  const tf = parseInt(document.getElementById('inputTF')?.value || 5) * 60 * 1000;
+  setTimeout(() => { settleSlot(slotIdx); }, tf);
+  } finally {
+    STATE.predicting = false;
+  }
+}
+
+// ========== 本地TA备用 ==========
+function computeLocalTA(candles) {
+  if (!candles || candles.length < 20) return { score: 0.5, dir: -1 };
+  const closes = candles.map(c => c.close);
+  const ema20 = closes.slice(-20).reduce((a,b) => a+b, 0) / 20;
+  let gains = 0, losses = 0;
+  for (let i = closes.length - 14; i < closes.length - 1; i++) {
+    const d = closes[i+1] - closes[i];
+    if (d > 0) gains += d; else losses -= d;
+  }
+  const rsi = gains === 0 ? 50 : 100 - 100 / (1 + gains / Math.max(losses, 0.0001));
+  const ema12 = closes.slice(-12).reduce((a,b)=>a+b,0)/12;
+  const ema26 = closes.slice(-26).reduce((a,b)=>a+b,0)/26;
+  const macd = ema12 - ema26;
+  const last = closes[closes.length - 1];
+  let score = 0.5;
+  if (last > ema20) score += 0.12;
+  if (rsi > 50 && rsi < 70) score += 0.08;
+  if (macd > 0) score += 0.08;
+  if (rsi < 30) score += 0.12;
+  if (rsi > 70) score -= 0.12;
+  score = Math.max(0.35, Math.min(0.85, score));
+  const dir = score >= 0.5 ? 1 : 0;
+  return { score, dir };
+}
+
+// ========== WEBSOCKET + REST备用 ==========
+
+// REST轮询：每30秒拉一次K线（WebSocket断开时作为备用，或直接使用）
+let _restPollTimer = null;
+let _wsConnected = false;
+let _lastCandleTime = 0;
+
+async function fetchKlinesREST(tf) {
+  try {
+    const r = await fetch(API_BASE + `/klines?limit=200&interval=${tf}`);
+    if (!r.ok) { log(`K线接口异常 ${r.status}`, 'error'); return; }
+    const data = await r.json();
+    if (!Array.isArray(data) || data.length === 0) { log('K线数据为空', 'warn'); return; }
+    
+    // 后端返回秒级时间戳，转成毫秒与WebSocket格式保持一致
+    const candles = data.map(k => ({
+      time: k.t * 1000, open: k.o, high: k.h, low: k.l, close: k.c, volume: k.v, closed: true
+    }));
+
+    // candleSeries可能还没初始化，等一下再试
+    if (!candleSeries) {
+      log('图表未就绪，500ms后重试...', 'warn');
+      setTimeout(() => fetchKlinesREST(tf), 500);
+      return;
+    }
+    
+    const latest = candles[candles.length - 1];
+
+    // 首次加载：渲染历史K线
+    if (_lastCandleTime === 0) {
+      loadChartHistory(candles);
+      STATE.candles = candles.slice(-100);
+      _lastCandleTime = latest.time;
+      STATE.currentPrice = latest.close;
+      updatePriceDisplay(latest.close, STATE.priceChange);
+      log(`K线历史加载完成 (${candles.length}根)`, 'success');
+      if (!_wsConnected) {
+        document.getElementById('connDot').className = 'dot online';
+        document.getElementById('connText').textContent = 'REST模式';
+      }
+    } else if (!_wsConnected) {
+      // 仅在 WebSocket 未连接时才用 REST 更新实时价格/K线，避免双数据源冲突
+      addChartCandle(latest);
+      const newCandles = candles.filter(c => c.time > _lastCandleTime && c.closed);
+      if (newCandles.length > 0) {
+        newCandles.forEach(c => addChartCandle(c));
+        STATE.candles.push(...newCandles);
+        if (STATE.candles.length > 500) STATE.candles = STATE.candles.slice(-500);
+      }
+      _lastCandleTime = latest.time;
+      STATE.currentPrice = latest.close;
+      updatePriceDisplay(latest.close, STATE.priceChange);
+    }
+    // WebSocket 已连接时：REST 拉取只更新 STATE.candles 历史备份，不更新图表和价格
+    else {
+      const newCandles = candles.filter(c => c.time > _lastCandleTime && c.closed);
+      if (newCandles.length > 0) {
+        STATE.candles.push(...newCandles);
+        if (STATE.candles.length > 500) STATE.candles = STATE.candles.slice(-500);
+        _lastCandleTime = newCandles[newCandles.length - 1].time;
+      }
+    }
+    
+  } catch(e) {
+    log(`K线拉取失败: ${e.message}`, 'error');
+  }
+}
+
+function startRESTPolling(tf) {
+  stopRESTPolling();
+  fetchKlinesREST(tf); // 立即拉一次（历史K线初始化）
+  _restPollTimer = setInterval(() => {
+    if (!STATE.running) return;
+    // WS已连接：每30秒做一次历史数据同步备份（不更新图表）
+    // WS断开：每30秒更新价格和K线
+    fetchKlinesREST(tf);
+  }, 30000);
+}
+
+function stopRESTPolling() {
+  if (_restPollTimer) { clearInterval(_restPollTimer); _restPollTimer = null; }
+}
+
+function connectKline(tf) {
+  if (STATE.wsKline) { STATE.wsKline.close(); STATE.wsKline = null; }
+  _wsConnected = false;
+  _lastCandleTime = 0;
+  
+  // 先用REST加载历史K线（立即显示）
+  startRESTPolling(tf);
+  
+  // 同时尝试WebSocket（如果能连就用，连不上就继续REST）
+  try {
+    const ws = new WebSocket(`wss://stream.binance.com:9443/ws/btcusdt@kline_${tf}`);
+    let wsOpenTimer = setTimeout(() => {
+      // 5秒内没连上，走纯REST模式
+      log('WebSocket不可用，切换REST轮询模式', 'warn');
+      ws.close();
+    }, 5000);
+    
+    ws.onopen = () => {
+      clearTimeout(wsOpenTimer);
+      _wsConnected = true;
+      log(`WebSocket K线流已连接 (${tf}m)`, 'success');
+      document.getElementById('connDot').className = 'dot online';
+      document.getElementById('connText').textContent = '实时连接';
+      // WS连上后立即拉一次历史K线，确保图表有数据
+      fetchKlinesREST(tf);
+    };
+    ws.onmessage = (e) => {
+      const d = JSON.parse(e.data);
+      const k = d.k;
+      const candle = { time: k.t, open: +k.o, high: +k.h, low: +k.l, close: +k.c, volume: +k.v, closed: k.x };
+      STATE.currentPrice = candle.close;
+      updatePriceDisplay(candle.close, STATE.priceChange);
+      STATE.candles.push(candle);
+      if (STATE.candles.length > 500) STATE.candles.shift();
+      addChartCandle(candle);
+      if (candle.closed && STATE.running) {
+        runPredictionCycle();
+      }
+      updateSlotTimers();
+    };
+    ws.onerror = () => { _wsConnected = false; };
+    ws.onclose = () => {
+      _wsConnected = false;
+      if (STATE.running) {
+        log('WebSocket断开，切换REST轮询...', 'warn');
+        document.getElementById('connText').textContent = 'REST模式';
+        setTimeout(() => { if (STATE.running) connectKline(tf); }, 10000);
+      }
+    };
+    STATE.wsKline = ws;
+  } catch(e) {
+    log('WebSocket初始化失败，使用REST模式', 'warn');
+  }
+  
+  // 并行拉取ticker价格变化（可选）
+  connectTicker();
+}
+
+function connectTicker() {
+  if (STATE.wsTicker) { STATE.wsTicker.close(); STATE.wsTicker = null; }
+  const ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@miniTicker');
+  ws.onmessage = (e) => {
+    const d = JSON.parse(e.data);
+    // 只更新24h涨跌幅百分比，不写STATE.currentPrice，避免与kline流价格冲突
+    STATE.priceChange = ((+d.c - +d.o) / +d.o * 100);
+    // 如果kline流还没给价格（STATE.currentPrice===0），才用ticker补一下
+    if (STATE.currentPrice <= 0 && +d.c > 0) {
+      STATE.currentPrice = +d.c;
+    }
+    if (STATE.currentPrice > 0) {
+      updatePriceDisplay(STATE.currentPrice, STATE.priceChange);
+    }
+  };
+  STATE.wsTicker = ws;
+}
+
+// ========== 启动/停止 ==========
+async function startEngine() {
+  if (STATE.running) return;
+  STATE.running = true;
+  STATE.warmupDone = false;
+  STATE.warmupRound = 0;
+  STATE.consecutiveLoss = 0;
+
+  document.getElementById('btnStart').disabled = true;
+  document.getElementById('btnStop').disabled = false;
+  document.getElementById('systemPhase').textContent = 'WARMING UP';
+  document.getElementById('connDot').className = 'dot waiting';
+
+  // 检查后端
+  const status = await checkBackend();
+  if (status && status.model_count === 0) {
+    log('后端已连接但模型未加载，建议先点"训练模型"', 'warn');
+  }
+
+  connectKline(STATE.currentTF);
+  log('引擎启动，等待第一根K线收线...', 'info');
+
+  // 先让模型权重条显示"加载中"动画
+  ['mb0','mb1','mb2','mb3','mb4'].forEach((id,i) => {
+    const el = document.getElementById(id);
+    if (el) { el.style.width = '15%'; el.style.opacity = '0.4'; }
+    const val = document.getElementById('mv' + i);
+    if (val) val.textContent = '...';
+  });
+
+  // 等K线先加载完（REST首次约2-3秒），再触发初始预测
+  setTimeout(async () => {
+    if (!STATE.running) return;
+    // 等有K线数据再预测，分三阶段打进度日志
+    let waited = 0;
+    let phase = 0;
+    const phases = [
+      { threshold: 1,  label: '▓░░  1/3  数据接入中...' },
+      { threshold: 5,  label: '▓▓░  2/3  特征计算中...' },
+      { threshold: 10, label: '▓▓▓  3/3  模型就绪...'   },
+    ];
+    while (STATE.candles.length < 10 && waited < 10000) {
+      const cur = STATE.candles.length;
+      if (phase === 0 && cur >= phases[0].threshold) {
+        log(`预热 ${phases[0].label}`, 'info'); phase = 1;
+      } else if (phase === 1 && cur >= phases[1].threshold) {
+        log(`预热 ${phases[1].label}`, 'info'); phase = 2;
+      } else if (phase === 2 && cur >= phases[2].threshold) {
+        log(`预热 ${phases[2].label}`, 'info'); phase = 3;
+      }
+      await new Promise(r => setTimeout(r, 500));
+      waited += 500;
+    }
+    log(`预热完成 ✓ 已加载 ${STATE.candles.length} 根K线，开始分析...`, 'success');
+    await runPredictionCycle();
+    STATE.warmupDone = true;
+    document.getElementById('systemPhase').textContent = 'ACTIVE';
+  }, 2000);
+
+  // REST模式下的定时预测（WebSocket没信号时作为备用，每分钟触发）
+  STATE.restPredictTimer = setInterval(async () => {
+    if (!STATE.running || _wsConnected) return; // WS正常时跳过
+    if (STATE.retraining) return;
+    await runPredictionCycle();
+  }, 60000);
+
+  // 每秒刷新订单槽倒计时（不依赖WebSocket消息）
+  STATE.slotTickTimer = setInterval(() => {
+    if (!STATE.running) return;
+    updateSlotTimers();
+  }, 1000);
+}
+
+function stopEngine() {
+  STATE.running = false;
+  if (STATE.wsKline) { STATE.wsKline.close(); STATE.wsKline = null; }
+  if (STATE.wsTicker) { STATE.wsTicker.close(); STATE.wsTicker = null; }
+  stopRESTPolling();
+  _wsConnected = false;
+  _lastCandleTime = 0;
+  if (STATE.restPredictTimer) { clearInterval(STATE.restPredictTimer); STATE.restPredictTimer = null; }
+  if (STATE.slotTickTimer) { clearInterval(STATE.slotTickTimer); STATE.slotTickTimer = null; }
+  document.getElementById('btnStart').disabled = false;
+  document.getElementById('btnStop').disabled = true;
+  document.getElementById('systemPhase').textContent = 'STANDBY';
+  document.getElementById('connDot').className = 'dot offline';
+
+  const label = document.getElementById('signalLabel');
+  if (label) { label.className = 'signal-label signal-wait'; label.textContent = '■  STOPPED'; }
+  const sub = document.getElementById('signalSub');
+  if (sub) sub.textContent = '引擎已停止';
+
+  log('引擎已停止', 'warn');
+}
+
+// ========== 手动训练 ==========
+async function trainModel() {
+  const btn = document.getElementById('btnTrain');
+  if (btn) btn.disabled = true;
+  document.getElementById('trainProgress').style.display = 'block';
+  
+  if (backendAvailable) {
+    log('触发后端训练...', 'info');
+    try {
+      const trainPeriod = parseInt(document.getElementById('inputTF')?.value || 10);
+      await fetch(API_BASE + '/train', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({period: trainPeriod})
+      });
+      const pollId = setInterval(async () => {
+        try {
+          const pr = await fetch(API_BASE + '/train/progress');
+          const pd = await pr.json();
+          document.getElementById('trainFill').style.width = pd.progress + '%';
+          document.getElementById('trainPct').textContent = pd.progress + '%';
+          document.getElementById('trainStatus').textContent = pd.status;
+          if (!pd.training) {
+            clearInterval(pollId);
+            document.getElementById('trainProgress').style.display = 'none';
+            STATE.trained = true;
+            if (btn) btn.disabled = false;
+            log('训练完成！', 'success');
+          }
+        } catch(e) { clearInterval(pollId); if (btn) btn.disabled = false; }
+      }, 2000);
+    } catch(e) {
+      log('训练请求失败', 'error');
+      if (btn) btn.disabled = false;
+    }
+  } else {
+    // 模拟训练
+    log('后端未连接，模拟训练中...', 'warn');
+    let p = 0;
+    const msgs = ['获取K线数据...','计算技术特征...','训练RF x3...','训练XGB x2...','训练LGB x2...','训练MLP...','集成投票...','完成'];
+    const intv = setInterval(() => {
+      p += 12;
+      document.getElementById('trainFill').style.width = Math.min(p,100) + '%';
+      document.getElementById('trainPct').textContent = Math.min(p,100) + '%';
+      document.getElementById('trainStatus').textContent = msgs[Math.floor(p/12)] || '完成';
+      if (p >= 96) {
+        clearInterval(intv);
+        setTimeout(() => {
+          document.getElementById('trainProgress').style.display = 'none';
+          STATE.trained = true;
+          if (btn) btn.disabled = false;
+          log('本地模拟训练完成（连接后端可获得真实模型）', 'success');
+        }, 500);
+      }
+    }, 500);
+  }
+}
+
+// ========== 周期切换 ==========
+function switchTF(tf) {
+  STATE.currentTF = tf;
+  document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  _lastCandleTime = 0; // 重置，让新TF的K线重新全量加载
+  if (STATE.running) connectKline(tf);
+}
+
+// ========== 导出 ==========
+function exportHistory() {
+  if (!STATE.history.length) { alert('暂无记录'); return; }
+
+  // 判断是否有自动下单金额设置
+  const atAmountEl = AT.mode === 'compound'
+    ? document.getElementById('atInitial')
+    : document.getElementById('atNormalAmount');
+  const atAmount = atAmountEl ? parseFloat(atAmountEl.value) : NaN;
+  const atPayout = parseFloat(document.getElementById('atPayout')?.value || 0.8);
+  const hasAmount = AT.licensed && !isNaN(atAmount) && atAmount > 0;
+
+  const rows = [['#','方向','开单价','结算价', ...(hasAmount ? ['金额','盈亏'] : []), '结果','置信度','开单时间','结算时间']];
+  STATE.history.forEach(h => {
+    const pnl = h.win ? (atAmount * atPayout).toFixed(2) : (-atAmount).toFixed(2);
+    rows.push([
+      h.id, h.dir, h.entryPrice.toFixed(2), h.closePrice.toFixed(2),
+      ...(hasAmount ? [atAmount, pnl] : []),
+      h.win ? 'WIN' : 'LOSS',
+      (h.conf*100).toFixed(0)+'%',
+      h.openTime.toISOString(), h.closeTime.toISOString()
+    ]);
+  });
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = `compound_engine_${Date.now()}.csv`;
+  a.click();
+}
+
+// ========== 自动下单模块 ==========
+const AT = {
+  licensed: false,
+  mode: 'normal',
+  platform: 'binance',
+  payout: 0.80,
+  compoundRunning: false,
+  autoEnabled: false,   // 是否开启「联动自动下单」（K线结算后自动触发）
+  logLines: [],
+  pollTimer: null,
+};
+
+function atTogglePanel() {
+  const panel = document.getElementById('autoTradePanel');
+  const btn = document.getElementById('btnAutoTrade');
+  if (panel.style.display === 'none') {
+    panel.style.display = 'block';
+    btn.style.boxShadow = '0 0 15px rgba(123,47,255,0.5)';
+    atLoadCoords();
+  } else {
+    panel.style.display = 'none';
+    btn.style.boxShadow = '';
+  }
+}
+
+function atLog(msg) {
+  const box = document.getElementById('atLog');
+  if (!box) return;
+  box.style.display = 'block';
+  const ts = new Date().toLocaleTimeString('zh-CN', {hour12:false});
+  AT.logLines.push(`[${ts}] ${msg}`);
+  if (AT.logLines.length > 60) AT.logLines.shift();
+  box.innerHTML = AT.logLines.map(l => `<div>${l}</div>`).join('');
+  box.scrollTop = box.scrollHeight;
+}
+
+async function atVerifyLicense() {
+  const code = document.getElementById('atLicenseInput').value.trim();
+  const msg = document.getElementById('atLicenseMsg');
+  if (!code) { msg.textContent = '请输入注册码'; return; }
+  msg.textContent = '验证中...';
+  try {
+    const r = await fetch(API_BASE + '/license/verify', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({code})
+    });
+    const d = await r.json();
+    if (d.ok) {
+      AT.licensed = true;
+      AT.autoEnabled = true;  // 激活后默认开启联动
+      document.getElementById('atLicenseBadge').textContent = '已激活';
+      document.getElementById('atLicenseBadge').style.cssText = 'margin-left:12px;font-size:11px;padding:2px 8px;border-radius:4px;background:rgba(0,255,136,0.15);color:var(--mech-green)';
+      document.getElementById('atLicenseRow').style.display = 'none';
+      const startBtn = document.getElementById('atBtnStart');
+      if (startBtn) startBtn.disabled = false;
+      document.getElementById('atAutoStatus').style.display = 'block';
+      const sa = document.getElementById('atSettingsArea');
+      if (sa) { sa.style.opacity = '1'; sa.style.pointerEvents = 'auto'; }
+      // 自动勾选普通/复利模式自动下单
+      const normalAutoCheck = document.getElementById('atNormalAutoCheck');
+      const compoundAutoCheck = document.getElementById('atCompoundAutoCheck');
+      if (normalAutoCheck) { normalAutoCheck.checked = true; atToggleNormalAuto(true); }
+      if (compoundAutoCheck) { compoundAutoCheck.checked = true; atToggleCompoundAuto(true); }
+      msg.textContent = d.message; msg.style.color = 'var(--mech-green)';
+      localStorage.setItem('ce_license', code);
+      atLog('✅ 注册码验证成功，联动模式已自动启用');
+    } else {
+      msg.textContent = d.message; msg.style.color = 'var(--mech-red)';
+      atLog('❌ 激活失败：' + d.message);
+    }
+  } catch(e) { msg.textContent = '连接后端失败'; msg.style.color='var(--mech-red)'; }
+}
+
+function atSetMode(mode) {
+  AT.mode = mode;
+  document.getElementById('atModeNormal').classList.toggle('active', mode==='normal');
+  document.getElementById('atModeCompound').classList.toggle('active', mode==='compound');
+  document.getElementById('atNormalPanel').style.display = mode==='normal' ? '' : 'none';
+  document.getElementById('atCompoundPanel').style.display = mode==='compound' ? '' : 'none';
+  // 复利模式才显示控制行按钮，普通模式用勾选框
+  const controlRow = document.getElementById('atCompoundControlRow');
+  if (controlRow) controlRow.style.display = mode==='compound' ? 'flex' : 'none';
+  // 停止按钮只在复利模式下有意义
+  const stopBtn = document.getElementById('atBtnStop');
+  if (stopBtn) stopBtn.style.display = mode==='compound' ? '' : 'none';
+}
+
+function atUpdatePlatform() {
+  AT.platform = document.getElementById('atPlatform').value;
+  const hint = document.getElementById('atAmountHint');
+  if (AT.platform === 'binance') {
+    hint.textContent = '（币安最低5u，整数）';
+    document.getElementById('atNormalAmount').step='1'; document.getElementById('atNormalAmount').min='5';
+    document.getElementById('atInitial').step='1'; document.getElementById('atInitial').min='5';
+  } else {
+    hint.textContent = '（山寨所最低3u，可3位小数）';
+    document.getElementById('atNormalAmount').step='0.001'; document.getElementById('atNormalAmount').min='3';
+    document.getElementById('atInitial').step='0.001'; document.getElementById('atInitial').min='3';
+  }
+}
+
+async function atPreviewPlan() {
+  const initial = parseFloat(document.getElementById('atInitial').value)||10;
+  const payout  = parseFloat(document.getElementById('atPayout').value)||0.8;
+  const rounds  = parseInt(document.getElementById('atRounds').value)||3;
+  const platform = document.getElementById('atPlatform').value;
+  try {
+    const r = await fetch(API_BASE+'/auto_trade/plan',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({initial,payout,rounds,platform})
+    });
+    const d = await r.json();
+    if (!d.ok||!d.plan) { atLog('计划获取失败'); return; }
+    const tbl = document.getElementById('atPlanTbody');
+    tbl.innerHTML = `<tr style="color:var(--mech-primary);font-weight:bold">
+      <td>注次</td><td>余额</td><td>下注</td><td>赢后余额</td></tr>` +
+      d.plan.map(p=>`<tr><td>第${p.round}注</td><td>${p.balance_before}u</td><td>${p.bet}u</td><td>${p.expected_balance}u</td></tr>`).join('');
+    const last = d.plan[d.plan.length-1];
+    const roi = ((last.expected_balance/initial-1)*100).toFixed(1);
+    document.getElementById('atPlanSummary').textContent =
+      `连赢${rounds}次：${initial}u → ${last.expected_balance}u（ROI ${roi}%）`;
+    document.getElementById('atPlanTable').style.display = 'block';
+  } catch(e) { atLog('预览失败：后端未连接'); }
+}
+
+function atShowCoords() {
+  const p=document.getElementById('atCoordsPanel');
+  p.style.display = p.style.display==='none' ? '' : 'none';
+}
+
+async function atLoadCoords() {
+  try {
+    const r = await fetch(API_BASE+'/auto_trade/coords');
+    const d = await r.json();
+    if (d.coords) {
+      const c=d.coords;
+      document.getElementById('cAmountX').value=c.amount?.[0]||0;
+      document.getElementById('cAmountY').value=c.amount?.[1]||0;
+      document.getElementById('cUpX').value=c.buy_up?.[0]||0;
+      document.getElementById('cUpY').value=c.buy_up?.[1]||0;
+      document.getElementById('cDownX').value=c.buy_down?.[0]||0;
+      document.getElementById('cDownY').value=c.buy_down?.[1]||0;
+      document.getElementById('cConfX').value=c.confirm?.[0]||0;
+      document.getElementById('cConfY').value=c.confirm?.[1]||0;
+      const allSet=Object.values(c).every(v=>v[0]>0||v[1]>0);
+      const st=document.getElementById('atCoordsStatus');
+      st.textContent=allSet?'✅ 已标定':'⚠️ 坐标未设置';
+      st.style.color=allSet?'var(--mech-green)':'var(--mech-yellow)';
+    }
+  } catch(e) {}
+}
+
+async function atSaveCoords() {
+  const v = id => parseInt(document.getElementById(id)?.value || 0) || 0;
+  const coords={
+    amount:  [v('cAmountX'), v('cAmountY')],
+    buy_up:  [v('cUpX'),     v('cUpY')],
+    buy_down:[v('cDownX'),   v('cDownY')],
+    confirm: [v('cConfX'),   v('cConfY')],
+  };
+  try {
+    const amountEl = document.getElementById('atNormalAmount');
+    const tradeAmount = parseFloat(amountEl?.value) || 10;
+    await fetch(API_BASE+'/auto_trade/coords',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({coords, trade_amount: tradeAmount})
+    });
+    document.getElementById('atCoordsStatus').textContent='✅ 坐标已保存';
+    document.getElementById('atCoordsStatus').style.color='var(--mech-green)';
+    atLog('📍 坐标已保存');
+  } catch(e) { atLog('保存失败：' + e.message); }
+}
+
+// ===== 一键引导标定（鼠标悬停5秒自动记录）=====
+const CALIBRATE_STEPS = [
+  { key: 'amount',    label: '第 1 步 / 4：金额输入框',   hint: '把鼠标移到交易所的「金额」输入框上，保持静止' },
+  { key: 'buy_up',   label: '第 2 步 / 4：买涨按钮',     hint: '把鼠标移到「买涨 / UP」按钮上，保持静止' },
+  { key: 'buy_down', label: '第 3 步 / 4：买跌按钮',     hint: '把鼠标移到「买跌 / DOWN」按钮上，保持静止' },
+  { key: 'confirm',  label: '第 4 步 / 4：确认下单按钮', hint: '把鼠标移到「确认 / 下单」按钮上，保持静止' },
+];
+
+let _calibrateStep = 0;
+let _calibrateResult = {};
+let _calibrateCountTimer = null;
+let _calibratePollTimer = null;
+let _calibrateActive = false;
+let _calibrateLastPos = null;
+let _calibrateHoldStart = null;
+let _calibrateCountingDown = false;
+let _calibrateCountdownSec = 5;
+
+function atStartCalibrateGuide() {
+  // 先确保坐标面板展开
+  const coordsPanel = document.getElementById('atCoordsPanel');
+  if (coordsPanel && coordsPanel.style.display === 'none') {
+    coordsPanel.style.display = '';
+  }
+  _calibrateStep = 0;
+  _calibrateResult = {};
+  _calibrateActive = true;
+  document.getElementById('calibrateGuide').style.display = 'block';
+  document.getElementById('calibrateManual').style.display = 'none';
+  // 构建步骤点
+  const dots = document.getElementById('calibrateStepDots');
+  dots.innerHTML = CALIBRATE_STEPS.map((_, i) =>
+    `<div class="cal-dot" id="calDot${i}" style="width:10px;height:10px;border-radius:50%;background:rgba(0,212,255,0.2);border:1px solid rgba(0,212,255,0.3);transition:all 0.3s"></div>`
+  ).join('');
+  atCalibrateRunStep();
+}
+
+function atCalibrateRunStep() {
+  if (!_calibrateActive) return;
+  const step = CALIBRATE_STEPS[_calibrateStep];
+  document.getElementById('calibrateStepDesc').textContent = `步骤 ${_calibrateStep + 1}／${CALIBRATE_STEPS.length}：${step.label.split('：')[1] || step.label}`;
+  document.getElementById('calibrateStepHint').textContent = step.hint;
+  document.getElementById('calibrateStepCounter').textContent = `${_calibrateStep + 1} / ${CALIBRATE_STEPS.length}`;
+  // 重置UI状态
+  document.getElementById('calibrateRingWrap').style.display = 'none';
+  document.getElementById('calibrateCaptured').style.display = 'none';
+  const confirmBtn = document.getElementById('calibrateConfirmBtn');
+  if (confirmBtn) confirmBtn.disabled = true;
+  // 更新步骤点颜色
+  CALIBRATE_STEPS.forEach((_, i) => {
+    const dot = document.getElementById('calDot' + i);
+    if (!dot) return;
+    if (i < _calibrateStep) { dot.style.background = 'var(--mech-green)'; dot.style.borderColor = 'var(--mech-green)'; }
+    else if (i === _calibrateStep) { dot.style.background = 'var(--mech-primary)'; dot.style.borderColor = 'var(--mech-primary)'; }
+    else { dot.style.background = 'rgba(0,212,255,0.2)'; dot.style.borderColor = 'rgba(0,212,255,0.3)'; }
+  });
+  // 重置倒计时变量
+  _calibrateCountdownSec = 5;
+  _calibrateLastPos = null;
+  _calibrateHoldStart = null;
+  _calibrateCountingDown = false;
+  // 实时轮询鼠标位置（每200ms），检测悬停
+  clearInterval(_calibratePollTimer);
+  _calibratePollTimer = setInterval(async () => {
+    if (!_calibrateActive) { clearInterval(_calibratePollTimer); return; }
+    try {
+      const r = await fetch(API_BASE + '/auto_trade/mouse_pos');
+      const d = await r.json();
+      if (!d.ok) return;
+      const curPos = `${d.x},${d.y}`;
+      document.getElementById('calibrateLivePos').textContent = d.x + ' , ' + d.y;
+      // 如果鼠标位置稳定，开始倒计时
+      if (curPos === _calibrateLastPos && !_calibrateCountingDown) {
+        if (!_calibrateHoldStart) _calibrateHoldStart = Date.now();
+        const heldMs = Date.now() - _calibrateHoldStart;
+        if (heldMs >= 500) {  // 稳定0.5秒后开始显示倒计时
+          _calibrateCountingDown = true;
+          document.getElementById('calibrateRingWrap').style.display = 'block';
+        }
+      } else if (curPos !== _calibrateLastPos) {
+        // 鼠标移动了，重置
+        _calibrateLastPos = curPos;
+        _calibrateHoldStart = null;
+        _calibrateCountingDown = false;
+        document.getElementById('calibrateRingWrap').style.display = 'none';
+        _calibrateCountdownSec = 5;
+      }
+      // 如果正在倒计时
+      if (_calibrateCountingDown && _calibrateHoldStart) {
+        const heldSec = Math.floor((Date.now() - _calibrateHoldStart) / 1000);
+        const remaining = Math.max(0, 5 - heldSec);
+        if (remaining !== _calibrateCountdownSec) {
+          _calibrateCountdownSec = remaining;
+          document.getElementById('calibrateCountdown').textContent = remaining;
+          const ring = document.getElementById('calibrateRing');
+          ring.style.strokeDashoffset = String(138.2 * (1 - remaining / 5));
+        }
+        if (remaining === 0) {
+          // 倒计时结束，自动录入
+          clearInterval(_calibratePollTimer);
+          atCalibrateAutoCapture(d.x, d.y);
+        }
+      }
+    } catch(e) {}
+  }, 200);
+}
+
+// 自动录入坐标（5秒悬停后调用）
+async function atCalibrateAutoCapture(x, y) {
+  const step = CALIBRATE_STEPS[_calibrateStep];
+  _calibrateResult[step.key] = [x, y];
+  // 填入手动输入框
+  if (step.key === 'amount')   { document.getElementById('cAmountX').value = x; document.getElementById('cAmountY').value = y; }
+  if (step.key === 'buy_up')   { document.getElementById('cUpX').value = x; document.getElementById('cUpY').value = y; }
+  if (step.key === 'buy_down') { document.getElementById('cDownX').value = x; document.getElementById('cDownY').value = y; }
+  if (step.key === 'confirm')  { document.getElementById('cConfX').value = x; document.getElementById('cConfY').value = y; }
+  // 显示已录入提示
+  document.getElementById('calibrateCaptured').style.display = 'block';
+  document.getElementById('calibrateCapturedPos').textContent = `${x}, ${y}`;
+  document.getElementById('calibrateRingWrap').style.display = 'none';
+  // 启用确定按钮
+  const confirmBtn = document.getElementById('calibrateConfirmBtn');
+  if (confirmBtn) confirmBtn.disabled = false;
+  atLog(`📍 已自动录入 ${step.label.split('：')[1] || step.label} (${x}, ${y})，请点击确认`);
+}
+
+// 用户点"确定此坐标"确认
+async function atCalibrateConfirm() {
+  if (!_calibrateActive) return;
+  const step = CALIBRATE_STEPS[_calibrateStep];
+  const coords = _calibrateResult[step.key];
+  if (!coords) return;
+  // 标记当前步骤完成
+  const dot = document.getElementById('calDot' + _calibrateStep);
+  if (dot) { dot.style.background = 'var(--mech-green)'; dot.style.borderColor = 'var(--mech-green)'; }
+  _calibrateStep++;
+  if (_calibrateStep < CALIBRATE_STEPS.length) {
+    // 继续下一步
+    document.getElementById('calibrateLivePos').textContent = '— , —';
+    atCalibrateRunStep();
+  } else {
+    // 全部完成
+    await atSaveCoords();
+    atCalibrateFinish();
+  }
+}
+
+function atCalibrateFinish() {
+  _calibrateActive = false;
+  clearInterval(_calibratePollTimer);
+  document.getElementById('calibrateStepDesc').textContent = '✅ 全部标定完成！坐标已自动保存。';
+  document.getElementById('calibrateLivePos').textContent = '完成';
+  atLog('🎯 坐标标定全部完成，已自动保存');
+  setTimeout(() => {
+    document.getElementById('calibrateGuide').style.display = 'none';
+    document.getElementById('calibrateManual').style.display = 'block';
+  }, 2000);
+}
+
+function atCalibrateCancel() {
+  _calibrateActive = false;
+  clearInterval(_calibratePollTimer);
+  _calibrateLastPos = null;
+  _calibrateHoldStart = null;
+  _calibrateCountingDown = false;
+  document.getElementById('calibrateGuide').style.display = 'none';
+  document.getElementById('calibrateManual').style.display = 'block';
+  atLog('标定已取消');
+}
+
+async function atAutoCalibrate() {
+  // 兼容旧调用，直接转到新引导
+  atStartCalibrateGuide();
+}
+
+// ===== 普通模式自动下单开关 =====
+function atToggleNormalAuto(enabled) {
+  AT.autoEnabled = enabled;
+  const hint = document.getElementById('atNormalAutoHint');
+  if (hint) hint.style.display = enabled ? 'inline' : 'none';
+  const statusDiv = document.getElementById('atAutoStatus');
+  if (statusDiv) statusDiv.style.display = enabled ? 'block' : 'none';
+  atLog(enabled ? '🤖 自动下单已启用（每根K线结算后自动执行）' : '⏸ 自动下单已关闭');
+}
+
+// ===== 复利模式自动下单开关 =====
+function atToggleCompoundAuto(enabled) {
+  AT.autoEnabled = enabled;
+  const hint = document.getElementById('atCompoundAutoHint');
+  if (hint) hint.style.display = enabled ? 'inline' : 'none';
+  const statusDiv = document.getElementById('atAutoStatus');
+  if (statusDiv) statusDiv.style.display = enabled ? 'block' : 'none';
+  atLog(enabled ? '🤖 自动下单已启用（每根K线结算后自动执行）' : '⏸ 自动下单已关闭');
+}
+
+async function atGetCurrentDirection() {
+  // 完整信号评估：复用主引擎的过滤逻辑，不符合条件返回null（跳过下单）
+  try {
+    const periodVal = parseInt(document.getElementById('inputTF')?.value || 10);
+    const r = await fetch(API_BASE+'/predict?period=' + periodVal);
+    const d = await r.json();
+    if (!d.direction) return null;
+
+    const conf         = d.confidence ?? 0;
+    const againstTrend = d.against_trend ?? false;
+    const trendDir     = d.trend_dir ?? 0;
+    const agreement    = d.agreement_rate ?? 0.5;
+    const confThreshold = parseInt(document.getElementById('inputConfThreshold')?.value || 70) / 100;
+
+    // 1. 置信度不足
+    if (conf < confThreshold) {
+      atLog(`⚠️ 置信度 ${(conf*100).toFixed(1)}% < 阈值 ${(confThreshold*100).toFixed(0)}%，跳过下单`);
+      return null;
+    }
+    // 2. 一致性不足
+    if (agreement < 0.55) {
+      atLog(`⚠️ 模型一致性 ${(agreement*100).toFixed(0)}% 不足55%，跳过下单`);
+      return null;
+    }
+    // 3. 逆势过滤：逆趋势时要求置信度额外高10%
+    if (againstTrend && conf < confThreshold + 0.10) {
+      const trendLabel = trendDir === 1 ? '上涨' : '下跌';
+      atLog(`⚠️ 逆${trendLabel}趋势且置信度 ${(conf*100).toFixed(1)}% 不足，跳过下单`);
+      return null;
+    }
+
+    return d.direction.toLowerCase() === 'up' ? 'up' : 'down';
+  } catch(e) {}
+  return null;
+}
+
+// ===== 联动自动触发（由结算后调用）=====
+let trader_busy = false;  // 防重入
+
+async function atAutoTrigger() {
+  if (!AT.licensed || trader_busy) return;
+  if (!STATE.running) return;  // 主引擎未启动则不触发
+  if (AT.compoundRunning) return;  // 复利模式进行中，不干扰状态机
+  trader_busy = true;
+  try {
+    const direction = await atGetCurrentDirection();  // 带完整过滤的信号评估
+    if (!direction) {
+      atLog('⏭ 联动触发：信号未通过过滤，跳过本次下单');
+      return;
+    }
+    const coords_data_r = await fetch(API_BASE + '/auto_trade/coords');
+    const coords_data = await coords_data_r.json();
+    const coords = coords_data.coords || {};
+    const rawAmount = AT.mode === 'normal'
+      ? parseFloat(document.getElementById('atNormalAmount')?.value)
+      : parseFloat(document.getElementById('atInitial')?.value);
+    const amount = (isNaN(rawAmount) || rawAmount <= 0) ? 10 : rawAmount;
+    const r = await fetch(API_BASE + '/auto_trade/execute', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ amount, direction })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      atLog(`🤖 联动下单：${amount}u ${direction === 'up' ? '📈买涨' : '📉买跌'}`);
+    } else {
+      atLog('❌ 联动下单失败：' + (d.error || '未知错误'));
+    }
+  } catch(e) {
+    atLog('❌ 联动下单异常：' + e.message);
+  } finally {
+    trader_busy = false;
+  }
+}
+
+async function atStart() {
+  if (!AT.licensed) { atLog('❌ 请先激活注册码'); return; }
+  if (AT.mode !== 'compound') return;  // 只处理复利模式启动
+  AT.payout = parseFloat(document.getElementById('atPayout').value)||0.8;
+  AT.platform = document.getElementById('atPlatform').value;
+  const startBtn = document.getElementById('atBtnStart');
+  if (startBtn) startBtn.disabled=true;
+  const stopBtn = document.getElementById('atBtnStop');
+  if (stopBtn) { stopBtn.disabled=false; stopBtn.style.display=''; }
+
+  const initial=parseFloat(document.getElementById('atInitial').value)||10;
+  const rounds=parseInt(document.getElementById('atRounds').value)||3;
+  try {
+    const r=await fetch(API_BASE+'/auto_trade/compound/start',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({initial,payout:AT.payout,rounds,platform:AT.platform})
+    });
+    const d=await r.json();
+    if(d.ok) {
+      AT.compoundRunning=true;
+      atLog(`▶ 复利启动：初始${initial}u，赔率${AT.payout}，目标${rounds}连赢`);
+      document.getElementById('atStatusText').textContent='复利进行中...';
+      document.getElementById('atResultRow').style.display='flex';
+      atStartPoll();
+    } else { atLog('❌ '+(d.error||'启动失败')); atResetBtns(); }
+  } catch(e) { atLog('❌ 后端连接失败'); atResetBtns(); }
+}
+
+async function atReportResult(result) {
+  const hint=document.getElementById('atResultHint');
+  hint.textContent=result==='win'?'✅ 已上报赢':'❌ 已上报输';
+  hint.style.color=result==='win'?'var(--mech-green)':'var(--mech-red)';
+  try {
+    await fetch(API_BASE+'/auto_trade/compound/result',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({result})
+    });
+    atLog(result==='win'?'🎉 本轮：赢':'💸 本轮：输，重置计数');
+    setTimeout(()=>{hint.textContent='';},2000);
+  } catch(e) { atLog('上报失败'); }
+}
+
+async function atStop() {
+  try { await fetch(API_BASE+'/auto_trade/stop',{method:'POST'}); } catch(e) {}
+  atStopPoll();
+  AT.compoundRunning=false;
+  document.getElementById('atResultRow').style.display='none';
+  document.getElementById('atStatusText').textContent='已停止';
+  atLog('⏹ 已停止');
+  atResetBtns();
+}
+
+function atStartPoll() {
+  atStopPoll();
+  AT.pollTimer=setInterval(async()=>{
+    try {
+      const r=await fetch(API_BASE+'/auto_trade/status');
+      const d=await r.json();
+      if(!d.available) return;
+      document.getElementById('atStatusText').textContent=
+        d.running ? `第${d.current_round}注 | 余额${d.current_balance}u` : d.status;
+      if (!d.running && AT.compoundRunning) {
+        AT.compoundRunning=false;
+        document.getElementById('atResultRow').style.display='none';
+        if(d.status==='completed') {
+          atLog('🏆 复利完成！最终余额：'+d.current_balance+'u');
+          document.getElementById('atStatusText').textContent='完成 | '+d.current_balance+'u';
+        }
+        atResetBtns(); atStopPoll();
+      }
+    } catch(e) {}
+  }, 2000);
+}
+
+function atStopPoll() {
+  if(AT.pollTimer){clearInterval(AT.pollTimer);AT.pollTimer=null;}
+}
+
+function atResetBtns() {
+  // 复利按钮状态复位
+  const startBtn = document.getElementById('atBtnStart');
+  const stopBtn = document.getElementById('atBtnStop');
+  if (startBtn) startBtn.disabled = !AT.licensed;
+  if (stopBtn) { stopBtn.disabled = true; stopBtn.style.display = 'none'; }
+}
+
+function atInit() {
+  // 初始化：默认普通模式，隐藏复利控制行
+  const controlRow = document.getElementById('atCompoundControlRow');
+  const stopBtn = document.getElementById('atBtnStop');
+  if (controlRow) controlRow.style.display = 'none';
+  if (stopBtn) stopBtn.style.display = 'none';
+
+  const cached=localStorage.getItem('ce_license');
+  if(cached) {
+    document.getElementById('atLicenseInput').value=cached;
+    setTimeout(async()=>{
+      try {
+        const r=await fetch(API_BASE+'/license/verify',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({code:cached})
+        });
+        const d=await r.json();
+        if(d.ok){
+          AT.licensed=true;
+          AT.autoEnabled=true;
+          document.getElementById('atLicenseBadge').textContent='已激活';
+          document.getElementById('atLicenseBadge').style.cssText='margin-left:12px;font-size:11px;padding:2px 8px;border-radius:4px;background:rgba(0,255,136,0.15);color:var(--mech-green)';
+          document.getElementById('atLicenseRow').style.display='none';
+          const startBtn = document.getElementById('atBtnStart');
+          if (startBtn) startBtn.disabled=false;
+          document.getElementById('atAutoStatus').style.display='block';
+          const sa=document.getElementById('atSettingsArea');
+          if(sa){sa.style.opacity='1';sa.style.pointerEvents='auto';}
+          // 恢复普通/复利模式勾选状态
+          const normalAutoCheck = document.getElementById('atNormalAutoCheck');
+          const compoundAutoCheck = document.getElementById('atCompoundAutoCheck');
+          if (normalAutoCheck) { normalAutoCheck.checked = true; atToggleNormalAuto(true); }
+          if (compoundAutoCheck) { compoundAutoCheck.checked = true; atToggleCompoundAuto(true); }
+        }
+      }catch(e){}
+    },2000);
+  }
+}
+
+// ========== 初始化 ==========
+window.addEventListener('DOMContentLoaded', () => {
+  initChart();
+  checkBackend();
+  updateStats();
+  renderHistory();
+  
+  // 隐藏训练进度条
+  const tp = document.getElementById('trainProgress');
+  if (tp) tp.style.display = 'none';
+  
+  // 连接BTC价格展示
+  const ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@miniTicker');
+  ws.onmessage = (e) => {
+    const d = JSON.parse(e.data);
+    const change = (+d.c - +d.o) / +d.o * 100;
+    updatePriceDisplay(+d.c, change);
+    STATE.currentPrice = +d.c;
+    STATE.priceChange = change;
+  };
+  
+  log('复利引擎初始化完成', 'success');
+  log('BTC实时数据流已连接', 'info');
+  log('点击"启动"开始自动交易', 'info');
+  if (!backendAvailable) {
+    log('提示：运行 compound_engine_server.py 可启用真实21模型预测', 'warn');
+  }
+  // 自动下单模块初始化
+  atInit();
+});
+</script>
+
+</body>
+</html>

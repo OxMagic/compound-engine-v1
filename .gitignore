@@ -1,0 +1,51 @@
+# Python缓存
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# 虚拟环境
+venv/
+env/
+.env
+.venv
+
+# 日志和CSV
+*.csv
+*.log
+health_log.txt
+
+# 本地诊断脚本（不需要上传）
+diag_*.py
+inspect_pkl.py
+
+# catboost训练缓存
+catboost_info/
+
+# 原作者文件夹（不上传，只保留我们自己的代码）
+原作者文件/
+
+# Windows临时文件
+*.tmp
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# 打包输出
+dist/
+build/
+*.spec
+
+# logo设计过程（定稿后单独处理）
+logo/
+
+# 交易记录（本地）
+交易记录/
+
+# 系统文件
+.DS_Store

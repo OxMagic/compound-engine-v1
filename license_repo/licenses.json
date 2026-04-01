@@ -1,0 +1,26 @@
+{
+  "CE-OXMAGIC-9F2A-7B4E": {
+    "limit": 99999,
+    "used": 0,
+    "active": true,
+    "note": "作者专属码 @OxMagic_ 永久无限次"
+  },
+  "CE-2026-ALPHA-FREE": {
+    "limit": 200,
+    "used": 0,
+    "active": true,
+    "note": "公开免费码，发布时用"
+  },
+  "CE-2026-BETA-VIP": {
+    "limit": 50,
+    "used": 0,
+    "active": true,
+    "note": "VIP测试码"
+  },
+  "CE-2026-TEST-001": {
+    "limit": 5,
+    "used": 0,
+    "active": true,
+    "note": "内部测试码，限5次"
+  }
+}
