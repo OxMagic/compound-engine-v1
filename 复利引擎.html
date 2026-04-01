@@ -957,6 +957,204 @@
   .corner-tr { top: 0; right: 0; border-width: 2px 2px 0 0; }
   .corner-bl { bottom: 0; left: 0; border-width: 0 0 2px 2px; }
   .corner-br { bottom: 0; right: 0; border-width: 0 2px 2px 0; }
+
+  /* VPN提示弹窗 */
+  #vpnOverlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(6, 13, 26, 0.95);
+    backdrop-filter: blur(8px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+  }
+  
+  #vpnOverlay.show {
+    display: flex;
+    animation: vpnFadeIn 0.4s ease-out;
+  }
+
+  @keyframes vpnFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .vpn-modal {
+    background: linear-gradient(135deg, rgba(10, 22, 40, 0.98), rgba(13, 31, 60, 0.98));
+    border: 2px solid rgba(0, 212, 255, 0.4);
+    border-radius: 2px;
+    padding: 40px;
+    max-width: 500px;
+    position: relative;
+    box-shadow: 
+      0 0 30px rgba(0, 212, 255, 0.2),
+      inset 0 0 20px rgba(0, 212, 255, 0.05);
+    animation: vpnSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  @keyframes vpnSlideIn {
+    from {
+      opacity: 0;
+      transform: scale(0.9) translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  .vpn-modal::before {
+    content: '';
+    position: absolute;
+    top: -2px; left: -2px; right: -2px; bottom: -2px;
+    background: linear-gradient(45deg, rgba(0, 212, 255, 0.1), rgba(123, 47, 255, 0.1));
+    z-index: -1;
+    border-radius: 2px;
+  }
+
+  .vpn-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 28px;
+    font-weight: 900;
+    color: #00d4ff;
+    text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+    margin-bottom: 15px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+
+  .vpn-icon {
+    display: inline-block;
+    font-size: 32px;
+    margin-right: 10px;
+    animation: vpnPulse 2s ease-in-out infinite;
+  }
+
+  @keyframes vpnPulse {
+    0%, 100% { text-shadow: 0 0 10px rgba(0, 212, 255, 0.5); }
+    50% { text-shadow: 0 0 30px rgba(0, 212, 255, 0.8); }
+  }
+
+  .vpn-desc {
+    color: #7aa8cc;
+    font-size: 14px;
+    line-height: 1.8;
+    margin-bottom: 25px;
+    border-left: 3px solid rgba(0, 212, 255, 0.3);
+    padding-left: 15px;
+  }
+
+  .vpn-links {
+    margin: 25px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .vpn-link-btn {
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.1), rgba(0, 212, 255, 0.05));
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    color: #00d4ff;
+    padding: 12px 15px;
+    border-radius: 2px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.3s ease;
+    text-align: left;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .vpn-link-btn::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.2), transparent);
+    transition: left 0.5s ease;
+  }
+
+  .vpn-link-btn:hover {
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(0, 212, 255, 0.1));
+    border-color: rgba(0, 212, 255, 0.6);
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+  }
+
+  .vpn-link-btn:hover::before {
+    left: 100%;
+  }
+
+  .vpn-link-text {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 12px;
+    opacity: 0.7;
+    margin-top: 3px;
+  }
+
+  .vpn-id {
+    background: rgba(0, 212, 255, 0.1);
+    border: 1px dashed rgba(0, 212, 255, 0.3);
+    padding: 12px;
+    border-radius: 2px;
+    margin: 20px 0;
+    text-align: center;
+    font-family: 'Rajdhani', monospace;
+    font-size: 14px;
+    color: #00ff88;
+  }
+
+  .vpn-id-label {
+    display: block;
+    font-size: 11px;
+    color: #7aa8cc;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .vpn-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 25px;
+  }
+
+  .vpn-btn {
+    flex: 1;
+    padding: 12px 15px;
+    border: none;
+    border-radius: 2px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .vpn-btn-primary {
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.3), rgba(0, 212, 255, 0.1));
+    border: 1px solid rgba(0, 212, 255, 0.5);
+    color: #00d4ff;
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
+  }
+
+  .vpn-btn-primary:hover {
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.4), rgba(0, 212, 255, 0.2));
+    box-shadow: 0 0 25px rgba(0, 212, 255, 0.4);
+  }
+
+  .vpn-btn-secondary {
+    background: transparent;
+    border: 1px solid rgba(122, 168, 204, 0.3);
+    color: #7aa8cc;
+  }
+
+  .vpn-btn-secondary:hover {
+    border-color: rgba(122, 168, 204, 0.6);
+    color: #b0d4ff;
+  }
 </style>
 </head>
 <body>
@@ -3096,6 +3294,9 @@ window.addEventListener('DOMContentLoaded', () => {
   const tp = document.getElementById('trainProgress');
   if (tp) tp.style.display = 'none';
   
+  // VPN检测（先检测再连WebSocket）
+  checkAndShowVPN();
+
   // 连接BTC价格展示
   const ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@miniTicker');
   ws.onmessage = (e) => {
@@ -3104,6 +3305,13 @@ window.addEventListener('DOMContentLoaded', () => {
     updatePriceDisplay(+d.c, change);
     STATE.currentPrice = +d.c;
     STATE.priceChange = change;
+  };
+  ws.onerror = () => {
+    // WebSocket连接失败时也弹VPN提示
+    const overlay = document.getElementById('vpnOverlay');
+    if (overlay && !overlay.classList.contains('show')) {
+      showVPNModal();
+    }
   };
   
   log('复利引擎初始化完成', 'success');
@@ -3115,7 +3323,88 @@ window.addEventListener('DOMContentLoaded', () => {
   // 自动下单模块初始化
   atInit();
 });
+
+// ========== VPN检测弹窗 ==========
+function checkVPNConnection() {
+  return new Promise((resolve) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      controller.abort();
+      resolve(false);
+    }, 6000);
+
+    fetch('https://api.binance.com/api/v3/ping', { 
+      signal: controller.signal,
+      mode: 'no-cors'
+    }).then(() => {
+      clearTimeout(timeout);
+      resolve(true);
+    }).catch(() => {
+      clearTimeout(timeout);
+      resolve(false);
+    });
+  });
+}
+
+function showVPNModal() {
+  const overlay = document.getElementById('vpnOverlay');
+  if (overlay) overlay.classList.add('show');
+}
+
+function closeVPNModal() {
+  const overlay = document.getElementById('vpnOverlay');
+  if (overlay) overlay.classList.remove('show');
+}
+
+async function checkAndShowVPN() {
+  const connected = await checkVPNConnection();
+  if (!connected) {
+    showVPNModal();
+  }
+}
 </script>
+
+<!-- VPN提示弹窗 -->
+<div id="vpnOverlay">
+  <div class="vpn-modal">
+    <div class="vpn-title">
+      <span class="vpn-icon">🛡️</span>网络检测
+    </div>
+    <div class="vpn-desc">
+      检测到无法连接海外服务器，实时行情数据暂不可用。<br>
+      请开启VPN后刷新页面，推荐使用以下稳定梯子：
+    </div>
+    
+    <div class="vpn-links">
+      <a href="https://github.com/LetsgoNetwork/LetsGo_2/blob/main/README.md" target="_blank" rel="noopener" style="text-decoration:none;">
+        <div class="vpn-link-btn">
+          🚀 LetsGo VPN — 下载链接
+          <div class="vpn-link-text">上线三年稳定运行 · 使用Chrome浏览器访问</div>
+        </div>
+      </a>
+      <a href="https://bitbucket.org/letsgo666/letsgogo_6/src/main/README.md" target="_blank" rel="noopener" style="text-decoration:none;">
+        <div class="vpn-link-btn">
+          📦 备用下载链接
+          <div class="vpn-link-text">推荐使用Chrome浏览器访问</div>
+        </div>
+      </a>
+    </div>
+
+    <div class="vpn-id">
+      <span class="vpn-id-label">填写邀请ID，双方均多得3天会员</span>
+      <strong style="font-size:18px; letter-spacing: 3px;">346554524</strong>
+    </div>
+
+    <div class="vpn-actions">
+      <button class="vpn-btn vpn-btn-primary" onclick="location.reload();">
+        ⟳ 已开启VPN，刷新
+      </button>
+      <button class="vpn-btn vpn-btn-secondary" onclick="closeVPNModal();">
+        稍后再说
+      </button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
