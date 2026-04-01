@@ -63,19 +63,17 @@ def wait_and_open():
 # ──────────────────────────────────────────────
 # 托盘/状态小窗（仅在打包环境启用，避免控制台闪退）
 # ──────────────────────────────────────────────
-def show_hidden_window():
-    """用 tkinter 创建一个隐藏窗口，让程序不退出即可（不显示给用户）"""
+def keep_alive():
+    """用 Windows API 静默等待，不弹出任何窗口"""
     try:
-        import tkinter as tk
-        root = tk.Tk()
-        root.title("复利引擎")
-        # 关键：隐藏窗口（不显示，但程序继续运行）
-        root.withdraw()
-        # 可选：显示系统托盘图标（需要第三方库如 pystray，为简化不实现）
-        # 用户可以在浏览器中正常使用程序，不需要看到这个窗口
-        root.mainloop()
+        import ctypes
+        # 用 kernel32 的 Sleep 循环保持进程存活
+        # 每60秒检查一次，进程会因为 daemon 线程自动退出
+        kernel32 = ctypes.windll.kernel32
+        while True:
+            kernel32.Sleep(60000)
     except Exception:
-        # 没有 tkinter 就静默等待
+        # 兜底方案
         threading.Event().wait()
 
 
@@ -91,9 +89,9 @@ if __name__ == '__main__':
     t_browser = threading.Thread(target=wait_and_open, daemon=True)
     t_browser.start()
 
-    # 3. 显示隐藏窗口（阻塞主线程，程序不退出）
+    # 3. 静默保持进程存活（不弹任何窗口）
     if getattr(sys, 'frozen', False):
-        show_hidden_window()
+        keep_alive()
     else:
         # 开发模式：直接等
         t_server.join()

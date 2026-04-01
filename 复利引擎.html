@@ -3327,22 +3327,19 @@ window.addEventListener('DOMContentLoaded', () => {
 // ========== VPN检测弹窗 ==========
 function checkVPNConnection() {
   return new Promise((resolve) => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => {
-      controller.abort();
-      resolve(false);
-    }, 6000);
+    let resolved = false;
+    const done = (result) => {
+      if (resolved) return;
+      resolved = true;
+      resolve(result);
+    };
 
-    fetch('https://api.binance.com/api/v3/ping', { 
-      signal: controller.signal,
-      mode: 'no-cors'
-    }).then(() => {
-      clearTimeout(timeout);
-      resolve(true);
-    }).catch(() => {
-      clearTimeout(timeout);
-      resolve(false);
-    });
+    // 方式1：用Image加载Google favicon（国内不通，有VPN才能加载）
+    const img = new Image();
+    const timer = setTimeout(() => done(false), 8000);
+    img.onload = () => { clearTimeout(timer); done(true); };
+    img.onerror = () => { clearTimeout(timer); done(false); };
+    img.src = 'https://www.google.com/favicon.ico?_t=' + Date.now();
   });
 }
 
