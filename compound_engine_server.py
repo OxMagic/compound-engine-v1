@@ -3294,13 +3294,32 @@ def api_license_verify():
     return jsonify(result)
 
 
+# ========== WSGI / gunicorn 兼容：懒加载模型 ==========
+
+_wsgi_models_loaded = False
+_wsgi_models_lock = threading.Lock()
+
+@app.before_request
+def _ensure_models_loaded():
+    """gunicorn prefork 模式下，每个 worker 第一次请求时加载模型"""
+    global _wsgi_models_loaded
+    if not _wsgi_models_loaded and not state['loaded']:
+        with _wsgi_models_lock:
+            if not _wsgi_models_loaded and not state['loaded']:
+                print("[INFO] WSGI worker: 首次请求，开始加载模型...")
+                try:
+                    load_all_models()
+                    _wsgi_models_loaded = True
+                    print("[INFO] WSGI worker: 模型加载完成")
+                except Exception as e:
+                    print(f"[ERROR] WSGI worker: 模型加载失败: {e}")
+                    import traceback; traceback.print_exc()
+
 if __name__ == '__main__':
     main()
 else:
-    # gunicorn / WSGI 模式下也需要启动后台线程
-    print("[INFO] WSGI 模式启动，初始化后台线程...")
-    t = threading.Thread(target=load_all_models, daemon=True)
-    t.start()
+    # gunicorn 模式下启动自动结算线程（模型由 before_request 懒加载）
+    print("[INFO] WSGI 模式启动，自动结算线程初始化...")
     t_settle = threading.Thread(target=auto_settle_loop, daemon=True)
     t_settle.start()
     print("[INFO] 自动补全线程已启动（每60秒结算到期预测）")
