@@ -4,12 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>复利引擎 | Compound Engine</title>
+<link rel="stylesheet" href="lib/fonts/fonts.css">
 <script src="lib/lightweight-charts.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="lib/chart.umd.min.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap');
-
   :root {
     --mech-primary: #00d4ff;
     --mech-secondary: #0a84ff;
@@ -734,6 +732,32 @@
     font-family: 'Orbitron', sans-serif;
   }
 
+  .rule-dot {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 9px;
+    padding: 2px 5px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.3);
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: all 0.3s ease;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .rule-dot.up {
+    background: rgba(255,45,85,0.15);
+    color: #ff2d55;
+    border-color: rgba(255,45,85,0.3);
+  }
+  .rule-dot.down {
+    background: rgba(0,255,136,0.15);
+    color: #00ff88;
+    border-color: rgba(0,255,136,0.3);
+  }
+
   .model-dir {
     width: 32px;
     text-align: center;
@@ -937,12 +961,17 @@
   .promo-guide {
     background: rgba(0, 212, 255, 0.05);
     border-left: 3px solid rgba(0, 212, 255, 0.3);
-    padding: 12px 16px;
+    padding: 14px 18px;
     border-radius: 2px;
     font-size: 12px;
     color: #7aa8cc;
     line-height: 1.8;
+    max-height: 480px;
+    overflow-y: auto;
   }
+  .promo-guide::-webkit-scrollbar { width: 4px; }
+  .promo-guide::-webkit-scrollbar-track { background: transparent; }
+  .promo-guide::-webkit-scrollbar-thumb { background: rgba(0,212,255,0.3); border-radius: 2px; }
 
   .promo-guide strong {
     color: #00d4ff;
@@ -951,11 +980,23 @@
 
   .promo-guide ol {
     margin-left: 20px;
-    margin-top: 8px;
+    margin-top: 4px;
+  }
+
+  .promo-guide ul {
+    margin-left: 16px;
   }
 
   .promo-guide li {
-    margin-bottom: 4px;
+    margin-bottom: 3px;
+  }
+
+  .promo-guide code {
+    background: rgba(0,212,255,0.1);
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: #00d4ff;
+    font-size: 11px;
   }
 
   /* ===== 自动下单面板 ===== */
@@ -1269,14 +1310,7 @@
   <div class="header">
     <div class="logo">
       <div class="logo-icon">
-        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <polygon points="24,2 44,12 44,36 24,46 4,36 4,12" fill="none" stroke="#00d4ff" stroke-width="1.5" opacity="0.5"/>
-          <polygon points="24,6 40,14 40,34 24,42 8,34 8,14" fill="rgba(0,212,255,0.08)"/>
-          <path d="M18 16h8a6 6 0 010 12H18V16z" fill="none" stroke="#00d4ff" stroke-width="2"/>
-          <path d="M18 28h10a6 6 0 010 12H18V28z" fill="none" stroke="#7b2fff" stroke-width="2"/>
-          <line x1="14" y1="20" x2="18" y2="20" stroke="#00ff88" stroke-width="2"/>
-          <line x1="14" y1="34" x2="18" y2="34" stroke="#00ff88" stroke-width="2"/>
-        </svg>
+        <img src="/assets/logo.png" alt="复利引擎" style="width:48px;height:48px;object-fit:contain;">
       </div>
       <div class="logo-text">
         <h1 class="neon-text">复利引擎</h1>
@@ -1461,6 +1495,15 @@
           </div>
           <div class="signal-label signal-wait" id="signalLabel">WARMING UP</div>
           <div style="font-size:11px;color:var(--text-dim);margin-top:4px;" id="signalSub">等待数据预热...</div>
+          <div style="font-size:10px;color:var(--mech-accent);margin-top:2px;opacity:0.7;" id="dynConfDisplay">阈值: 65.0%</div>
+          <div id="entryScoreDisplay" style="display:none;margin-top:8px;padding:8px 12px;background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.15);border-radius:8px;text-align:center;">
+            <div style="font-size:10px;color:var(--text-dim);margin-bottom:2px;">进场评分</div>
+            <div style="display:flex;align-items:baseline;justify-content:center;gap:6px;">
+              <span id="entryScoreGrade" style="font-size:28px;font-weight:900;color:var(--mech-accent);">--</span>
+              <span id="entryScoreNum" style="font-size:18px;font-weight:700;color:var(--text-dim);">/100</span>
+            </div>
+            <div id="entryScoreDetails" style="display:flex;flex-wrap:wrap;gap:4px 8px;margin-top:6px;justify-content:center;font-size:9px;color:var(--text-dim);"></div>
+          </div>
         </div>
       </div>
 
@@ -1496,13 +1539,24 @@
               <span class="ctrl-range-val" id="confThreshVal">70%</span>
             </div>
           </div>
+          <div class="ctrl-section" style="display:flex;align-items:center;justify-content:space-between;">
+            <div class="ctrl-label" style="margin:0">🔊 语音播报</div>
+            <label style="position:relative;display:inline-block;width:40px;height:22px;cursor:pointer;">
+              <input type="checkbox" id="chkVoice" style="opacity:0;width:0;height:0;" checked>
+              <span style="position:absolute;inset:0;background:rgba(255,255,255,0.1);border-radius:11px;transition:.3s;border:1px solid rgba(255,255,255,0.15);"
+                id="voiceToggleTrack"></span>
+              <span style="position:absolute;left:3px;top:3px;width:16px;height:16px;background:var(--mech-accent);border-radius:50%;transition:.3s;"
+                id="voiceToggleThumb"></span>
+            </label>
+          </div>
 
           <div class="btn-row">
             <button class="mech-btn btn-start" id="btnStart" onclick="startEngine()">▶ 启动</button>
             <button class="mech-btn btn-stop" id="btnStop" onclick="stopEngine()" disabled>■ 停止</button>
-            <button class="mech-btn btn-train" id="btnTrain" onclick="trainModel()">⚡ 训练模型</button>
             <button class="mech-btn btn-export" onclick="exportHistory()">↓ 导出历史记录</button>
             <button class="mech-btn" id="btnAutoTrade" onclick="atTogglePanel()" style="background:rgba(123,47,255,0.15);border-color:var(--mech-accent);color:var(--mech-accent)">🤖 自动下单</button>
+            <button class="mech-btn" id="btnBacktest" onclick="runBacktest()" style="background:rgba(0,212,255,0.1);border-color:rgba(0,212,255,0.3);color:#00d4ff">📊 回测</button>
+            <button class="mech-btn" id="btnTrain" onclick="manualTrain()" style="background:rgba(255,165,0,0.1);border-color:rgba(255,165,0,0.3);color:#ffa500">🔧 训练</button>
           </div>
 
           <div class="train-progress" id="trainProgress">
@@ -1567,6 +1621,20 @@
             </div>
             <div class="model-dir dir-neutral" id="md4">-</div>
           </div>
+          <!-- 规则模型指示灯 -->
+          <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,212,255,0.15);">
+            <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px;letter-spacing:1px;">规则模型</div>
+            <div style="display:flex;flex-wrap:wrap;gap:3px;" id="ruleLights">
+              <span class="rule-dot" id="rule_trend" title="趋势跟随">趋势</span>
+              <span class="rule-dot" id="rule_mean_rev" title="均值回归">回归</span>
+              <span class="rule-dot" id="rule_momentum" title="动量">动量</span>
+              <span class="rule-dot" id="rule_volume" title="成交量">量能</span>
+              <span class="rule-dot" id="rule_volatility" title="波动率">波动</span>
+              <span class="rule-dot" id="rule_breakout" title="突破">突破</span>
+              <span class="rule-dot" id="rule_pattern" title="K线形态">形态</span>
+              <span class="rule-dot" id="rule_sentiment" title="市场情绪">情绪</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1575,6 +1643,29 @@
         <div class="panel-title">胜率曲线</div>
         <div class="winrate-panel">
           <canvas id="winRateChart"></canvas>
+        </div>
+      </div>
+
+      <!-- 预测统计 & 在线学习状态 -->
+      <div class="panel" id="statsPanel">
+        <div class="panel-title">📊 预测统计
+          <span style="float:right;display:flex;gap:6px;font-weight:400;">
+            <select id="statsPeriod" onchange="loadStats()" style="font-size:10px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);color:var(--mech-accent);border-radius:4px;padding:2px 6px;cursor:pointer;">
+              <option value="1">1h</option>
+              <option value="6">6h</option>
+              <option value="24" selected>24h</option>
+              <option value="72">3d</option>
+              <option value="168">7d</option>
+              <option value="720">30d</option>
+            </select>
+          </span>
+        </div>
+        <div id="statsContent" style="padding:10px;">
+          <!-- 加载中 -->
+          <div style="text-align:center;color:var(--text-dim);font-size:12px;padding:10px;">
+            <div class="scan-line" style="width:60%;margin:0 auto 6px;"></div>
+            等待数据积累...
+          </div>
         </div>
       </div>
 
@@ -1587,6 +1678,40 @@
         </div>
       </div>
 
+    </div>
+  </div>
+
+  <!-- ===== 回测面板 ===== -->
+  <div class="panel" id="backtestPanel" style="display:none;">
+    <div class="panel-title">📊 回测分析
+      <span style="float:right;font-size:11px;color:var(--text-dim);font-weight:400;" id="btMeta"></span>
+    </div>
+    <div id="btLoading" style="text-align:center;padding:20px;color:var(--mech-accent);">
+      <div class="scan-line"></div>
+      <div style="margin-top:8px;">回测计算中，请稍候...</div>
+    </div>
+    <div id="btResult" style="display:none;padding:12px;">
+      <!-- 核心指标 -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
+        <div style="text-align:center;padding:8px;background:rgba(0,212,255,0.05);border-radius:8px;">
+          <div style="font-size:10px;color:var(--text-dim);">胜率</div>
+          <div id="btWinRate" style="font-size:22px;font-weight:900;color:#00ff88;">--</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:rgba(0,212,255,0.05);border-radius:8px;">
+          <div style="font-size:10px;color:var(--text-dim);">总样本</div>
+          <div id="btTotal" style="font-size:22px;font-weight:900;">--</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:rgba(0,212,255,0.05);border-radius:8px;">
+          <div style="font-size:10px;color:var(--text-dim);">最大连赢</div>
+          <div id="btStreak" style="font-size:22px;font-weight:900;color:#00d4ff;">--</div>
+        </div>
+      </div>
+      <!-- 盈亏曲线 -->
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;">模拟盈亏曲线（0.85赔率，每次1U）</div>
+      <canvas id="btChart" height="120" style="width:100%;border-radius:8px;background:rgba(0,0,0,0.2);"></canvas>
+      <!-- 置信度分桶胜率 -->
+      <div style="font-size:11px;color:var(--text-dim);margin-top:12px;margin-bottom:6px;">置信度分桶胜率</div>
+      <div id="btConfBuckets" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
     </div>
   </div>
 
@@ -1612,7 +1737,7 @@
         <label class="at-label">平台</label>
         <select id="atPlatform" class="at-select" onchange="atUpdatePlatform()">
           <option value="binance">币安（≥5u，整数）</option>
-          <option value="altcoin">山寨所（≥3u，3位小数）</option>
+          <option value="altcoin">HiBT（≥3u，3位小数）</option>
         </select>
         <label class="at-label" style="margin-left:18px">赔率</label>
         <input type="number" id="atPayout" value="0.80" min="0.5" max="1" step="0.01" class="at-input" style="width:80px">
@@ -1660,15 +1785,7 @@
           <table id="atPlanTbody" style="width:100%;border-collapse:collapse"></table>
           <div id="atPlanSummary" style="margin-top:6px;color:var(--mech-green);font-weight:bold"></div>
         </div>
-        <!-- 自动下单勾选 -->
-        <div class="at-row" style="margin-top:8px;align-items:center;gap:8px">
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-secondary);user-select:none">
-            <input type="checkbox" id="atCompoundAutoCheck" onchange="atToggleCompoundAuto(this.checked)"
-              style="width:15px;height:15px;accent-color:var(--mech-primary);cursor:pointer">
-            <span>启用自动下单（每根K线结算后自动执行）</span>
-          </label>
-          <span id="atCompoundAutoHint" style="font-size:11px;color:var(--mech-green);display:none">✅ 已启用</span>
-        </div>
+        <!-- 复利模式说明：点"开始复利"按钮即可，复利有自己的循环控制，不需要联动勾选 -->
 
         <!-- 本轮结果上报 -->
         <div id="atResultRow" style="display:none" class="at-row">
@@ -1795,14 +1912,62 @@
     </div>
     <div class="promo-guide">
       <strong>📋 快速上手教程：</strong>
+
+      <div style="margin-top:10px;margin-bottom:8px;color:#00d4ff;font-weight:700;font-size:13px">一、交易所注册 &amp; 入金</div>
       <ol>
         <li>点击上方链接注册交易所账号（支持手机号/邮箱）</li>
-        <li>完成身份认证（KYC），部分平台可跳过</li>
+        <li>完成身份认证（KYC），HiBT可跳过</li>
         <li>入金：充值 USDT（推荐从钱包转账，手续费最低）</li>
-        <li>进入事件合约板块，选择 BTC 事件合约</li>
-        <li>设置自动下单坐标标定，开启联动模式，引擎自动下单</li>
       </ol>
-      <span style="color:var(--text-dim); font-size:11px;">⚠️ 事件合约有风险，请使用可承受的资金，切勿全仓操作</span>
+
+      <div style="margin-top:10px;margin-bottom:8px;color:#00d4ff;font-weight:700;font-size:13px">二、启动引擎</div>
+      <ol start="4">
+        <li><strong>确保已开启VPN</strong>（引擎需要连接Binance获取实时行情和训练数据，无VPN将无法运行）</li>
+        <li><strong>网页版</strong>：访问部署链接直接打开；<strong>本地版</strong>：运行 <code style="background:rgba(0,212,255,0.1);padding:1px 5px;border-radius:3px;color:#00d4ff">复利引擎.exe</code>，自动打开浏览器</li>
+        <li>页面加载后自动连接 BTC 实时行情（K线图开始滚动）</li>
+        <li>点击 <strong>「▶ 启动」</strong>，引擎自动开始后台训练 + 实时预测（训练进度在日志区显示，约1~3分钟完成）</li>
+      </ol>
+
+      <div style="margin-top:10px;margin-bottom:8px;color:#00d4ff;font-weight:700;font-size:13px">三、理解信号</div>
+      <ul style="margin-left:18px;margin-top:4px">
+        <li><span style="color:#ff2d55;font-weight:bold">▲ UP</span> / <span style="color:#00ff88;font-weight:bold">▼ DOWN</span> — 模型预测下一根K线方向</li>
+        <li><strong>置信度</strong>：所有模型投票后的概率（&gt;50%建议关注，&gt;65%信号较强）</li>
+        <li><strong>一致性</strong>：模型之间是否统一（&lt;55%说明模型分歧大，信号会被自动跳过）</li>
+        <li><strong>趋势过滤</strong>：逆势信号需额外 +10% 置信度才通过（避免逆势操作）</li>
+      </ul>
+
+      <div style="margin-top:10px;margin-bottom:8px;color:#00d4ff;font-weight:700;font-size:13px">四、交易所操作</div>
+      <ol start="9">
+        <li>进入交易所的事件合约板块，选择 <strong>BTC 5分钟事件合约</strong></li>
+        <li>先手动观察几根K线，对比引擎信号和实际涨跌，熟悉后再启用自动下单</li>
+      </ol>
+
+      <div style="margin-top:10px;margin-bottom:8px;color:#00d4ff;font-weight:700;font-size:13px">五、配置自动下单</div>
+      <ol start="11">
+        <li>点击主界面的 <strong>「🤖 自动下单」</strong> 按钮，展开控制面板</li>
+        <li>输入<strong>注册码</strong>并点击「激活」（无注册码无法使用自动下单功能）</li>
+        <li><strong>选择平台</strong>：币安（≥5U整数）或HiBT（≥3U三位小数）</li>
+        <li><strong>设置赔率</strong>：填写交易所实际赔率（默认80%，即赢1次赚80%）</li>
+        <li><strong>选择模式</strong>：
+          <ul style="margin-left:18px;margin-top:2px">
+            <li><strong>普通模式</strong>：每单固定金额，适合稳健操作</li>
+            <li><strong>复利模式</strong>：赢了金额翻倍滚仓，输了重置回初始金额（高收益高风险）</li>
+          </ul>
+        </li>
+        <li>点击 <strong>「📍 坐标标定」</strong>，按引导在交易所页面上依次标定4个坐标（买入涨/买入跌/金额输入/确认按钮）</li>
+        <li>勾选 <strong>「启用自动下单」</strong>，引擎每根K线结算后自动评估信号并下单</li>
+      </ol>
+
+      <div style="margin-top:10px;margin-bottom:8px;color:#00d4ff;font-weight:700;font-size:13px">六、注意事项</div>
+      <ul style="margin-left:18px;margin-top:4px">
+        <li>坐标标定后如果浏览器窗口移动/缩放了，需要<strong>重新标定</strong></li>
+        <li>自动下单期间请勿遮挡或最小化交易所浏览器窗口</li>
+        <li>信号仅供参考，<strong>市场极端行情下模型可能失效</strong></li>
+        <li>首次使用建议先用<strong>最小金额</strong>观察，确认稳定后再加大</li>
+        <li>可随时点击 <strong>「■ 停止」</strong> 或取消自动下单勾选来暂停</li>
+      </ul>
+
+      <span style="color:var(--text-dim); font-size:11px;display:inline-block;margin-top:8px">⚠️ 事件合约有风险，请使用可承受的资金，切勿全仓操作</span>
     </div>
   </div>
 
@@ -1829,11 +1994,15 @@ async function checkBackend() {
     const d = await r.json();
     backendAvailable = true;
     const mc = d.model_count || 0;
-    if (mc === 0) {
+    const totalMc = d.total_model_count || mc;
+    const tfInfo = d.tf_models || {};
+    if (mc === 0 && totalMc === 0) {
       log('后端已连接，模型加载中…请稍候再启动引擎', 'warn');
       document.getElementById('systemPhase').textContent = 'LOADING';
     } else {
-      log(`后端已连接，${mc} 个真实模型已加载`, 'success');
+      const tfParts = Object.entries(tfInfo).map(([k,v]) => `${k}:${v}个`).join(' ');
+      const tfStr = tfParts ? ` | 多周期[${tfParts}]` : '';
+      log(`后端已连接，${totalMc} 个模型已加载（根目录${mc}个${tfStr}）`, 'success');
       document.getElementById('systemPhase').textContent = 'REAL MODEL';
     }
     return d;
@@ -1941,6 +2110,354 @@ function updatePriceDisplay(price, change) {
   pct.className = 'change ' + (change >= 0 ? 'up' : 'down');
 }
 
+// ========== BACKTEST ==========
+async function runBacktest() {
+  const panel = document.getElementById('backtestPanel');
+  const loading = document.getElementById('btLoading');
+  const result = document.getElementById('btResult');
+  if (!panel) return;
+
+  if (panel.style.display !== 'none') {
+    panel.style.display = 'none';
+    return;
+  }
+
+  panel.style.display = 'block';
+  loading.style.display = 'block';
+  result.style.display = 'none';
+
+  try {
+    const r = await fetch(API_BASE + '/backtest?period=5&samples=100');
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.error || '回测失败');
+    }
+    const d = await r.json();
+    loading.style.display = 'none';
+    result.style.display = 'block';
+
+    // 核心指标
+    document.getElementById('btMeta').textContent = `周期5min · ${d.samples}样本`;
+    document.getElementById('btWinRate').textContent = d.win_rate + '%';
+    document.getElementById('btWinRate').style.color = d.win_rate >= 55 ? '#00ff88' : d.win_rate >= 50 ? '#ffa502' : '#ff2d55';
+    document.getElementById('btTotal').textContent = `${d.wins}W/${d.losses}L`;
+    document.getElementById('btStreak').textContent = d.max_streak_win;
+
+    // 盈亏曲线
+    drawBacktestChart(d.cumulative);
+
+    // 置信度分桶
+    const bucketEl = document.getElementById('btConfBuckets');
+    let bhtml = '';
+    for (const [range, stat] of Object.entries(d.conf_stats)) {
+      if (stat.total === 0) continue;
+      const color = stat.rate >= 55 ? '#00ff88' : stat.rate >= 50 ? '#ffa502' : '#ff2d55';
+      bhtml += `<div style="padding:4px 8px;background:rgba(255,255,255,0.05);border-radius:6px;font-size:11px;">
+        <span style="color:var(--text-dim)">${range}%</span>
+        <span style="color:${color};font-weight:700;margin-left:4px;">${stat.rate}%</span>
+        <span style="color:var(--text-dim);font-size:9px;">(${stat.wins}/${stat.total})</span>
+      </div>`;
+    }
+    bucketEl.innerHTML = bhtml;
+
+    log(`📊 回测完成：${d.samples}样本，胜率${d.win_rate}%，最大连胜${d.max_streak_win}`, 'info');
+    VoiceEngine.speak(`回测完成，胜率${Math.round(d.win_rate)}%`);
+
+  } catch(e) {
+    loading.style.display = 'none';
+    result.style.display = 'block';
+    result.innerHTML = `<div style="color:#ff2d55;text-align:center;padding:20px;">回测失败: ${e.message}</div>`;
+    log(`回测失败: ${e.message}`, 'error');
+  }
+}
+
+function drawBacktestChart(cumulative) {
+  const canvas = document.getElementById('btChart');
+  if (!canvas || !cumulative.length) return;
+
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 120 * dpr;
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = 120;
+  const pad = { top: 10, bottom: 15, left: 40, right: 10 };
+  const cw = W - pad.left - pad.right;
+  const ch = H - pad.top - pad.bottom;
+
+  const minVal = Math.min(...cumulative);
+  const maxVal = Math.max(...cumulative);
+  const range = maxVal - minVal || 1;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // 零线
+  const zeroY = pad.top + ch * (maxVal / range);
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(W - pad.right, zeroY); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.font = '9px monospace';
+  ctx.fillText('0', pad.left - 12, zeroY + 3);
+
+  // 曲线
+  const gradient = ctx.createLinearGradient(0, pad.top, 0, H - pad.bottom);
+  gradient.addColorStop(0, 'rgba(0,255,136,0.3)');
+  gradient.addColorStop(1, 'rgba(255,45,85,0.3)');
+
+  ctx.beginPath();
+  for (let i = 0; i < cumulative.length; i++) {
+    const x = pad.left + (i / (cumulative.length - 1)) * cw;
+    const y = pad.top + ch * (1 - (cumulative[i] - minVal) / range);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = cumulative[cumulative.length - 1] >= 0 ? '#00ff88' : '#ff2d55';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // 填充
+  const lastX = pad.left + cw;
+  const lastY = pad.top + ch * (1 - (cumulative[cumulative.length - 1] - minVal) / range);
+  ctx.lineTo(lastX, H - pad.bottom);
+  ctx.lineTo(pad.left, H - pad.bottom);
+  ctx.closePath();
+  ctx.fillStyle = gradient;
+  ctx.fill();
+
+  // 最终值
+  const finalVal = cumulative[cumulative.length - 1];
+  ctx.fillStyle = finalVal >= 0 ? '#00ff88' : '#ff2d55';
+  ctx.font = 'bold 11px monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText((finalVal >= 0 ? '+' : '') + finalVal.toFixed(1) + 'U', W - pad.right, pad.top + ch * (1 - (finalVal - minVal) / range) - 4);
+}
+
+// ========== 预测统计 & 在线学习 ==========
+let _statsTimer = null;
+
+async function loadStats() {
+  try {
+    const hours = document.getElementById('statsPeriod').value;
+    const r = await fetch(API_BASE + '/stats?hours=' + hours);
+    if (!r.ok) return;
+    const d = await r.json();
+    if (!d.ok) return;
+    renderStats(d);
+  } catch(e) { /* 静默 */ }
+}
+
+function renderStats(d) {
+  const el = document.getElementById('statsContent');
+  if (!el) return;
+
+  const wr = d.win_rate || 0;
+  const wrColor = wr >= 55 ? '#00ff88' : wr >= 45 ? '#ffd700' : '#ff2d55';
+  const settled = d.settled || 0;
+  const correct = d.correct || 0;
+  const wrong = d.wrong || 0;
+  const unsettle = d.unsettled_count || 0;
+
+  // 置信度分桶HTML
+  let bucketsHtml = '';
+  const buckets = d.confidence_buckets || {};
+  const bucketOrder = ['80%+', '70-80%', '60-70%', '<60%'];
+  for (const k of bucketOrder) {
+    const b = buckets[k] || {total: 0, wins: 0, win_rate: 0};
+    if (b.total === 0) continue;
+    const c = b.win_rate >= 55 ? '#00ff88' : b.win_rate >= 45 ? '#ffd700' : '#ff2d55';
+    bucketsHtml += `
+      <div style="text-align:center;min-width:60px;">
+        <div style="font-size:9px;color:var(--text-dim);margin-bottom:2px;">${k}</div>
+        <div style="font-size:16px;font-weight:700;color:${c};">${b.win_rate.toFixed(0)}%</div>
+        <div style="font-size:9px;color:var(--text-dim);">${b.total}条</div>
+      </div>`;
+  }
+
+  // 最近连胜/连败
+  const streaks = d.recent_streaks || [];
+  let streakHtml = '';
+  if (streaks.length > 0) {
+    const last = streaks[0];
+    if (last.correct === 1) {
+      streakHtml = `<span style="color:#00ff88;">🔥 连赢 ${last.length} 次</span>`;
+    } else {
+      streakHtml = `<span style="color:#ff2d55;">💔 连败 ${last.length} 次</span>`;
+    }
+  }
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">
+      <div style="text-align:center;padding:8px;background:rgba(0,255,136,0.05);border:1px solid rgba(0,255,136,0.15);border-radius:8px;">
+        <div style="font-size:9px;color:var(--text-dim);letter-spacing:1px;">胜率</div>
+        <div style="font-size:24px;font-weight:900;color:${wrColor};">${wr.toFixed(1)}%</div>
+        <div style="font-size:9px;color:var(--text-dim);">${correct}W / ${wrong}L</div>
+      </div>
+      <div style="text-align:center;padding:8px;background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.15);border-radius:8px;">
+        <div style="font-size:9px;color:var(--text-dim);letter-spacing:1px;">已结算</div>
+        <div style="font-size:24px;font-weight:900;color:var(--mech-accent);">${settled}</div>
+        <div style="font-size:9px;color:var(--text-dim);">${unsettle > 0 ? unsettled + ' 条待结算' : '无待结算'}</div>
+      </div>
+      <div style="text-align:center;padding:8px;background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.15);border-radius:8px;">
+        <div style="font-size:9px;color:var(--text-dim);letter-spacing:1px;">均置信度</div>
+        <div style="font-size:24px;font-weight:900;">${(d.avg_confidence * 100).toFixed(0)}%</div>
+        <div style="font-size:9px;color:var(--text-dim);">正确${(d.avg_conf_correct*100).toFixed(0)}% / 错误${(d.avg_conf_wrong*100).toFixed(0)}%</div>
+      </div>
+      <div style="text-align:center;padding:8px;background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.15);border-radius:8px;">
+        <div style="font-size:9px;color:var(--text-dim);letter-spacing:1px;">一致性</div>
+        <div style="font-size:24px;font-weight:900;">${(d.avg_agreement * 100).toFixed(0)}%</div>
+        <div style="font-size:10px;">${streakHtml || '<span style="color:var(--text-dim);">暂无</span>'}</div>
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--text-dim);margin-bottom:4px;letter-spacing:1px;">置信度分桶胜率</div>
+    <div style="display:flex;gap:10px;justify-content:center;padding:6px;background:rgba(0,0,0,0.2);border-radius:8px;flex-wrap:wrap;">
+      ${bucketsHtml || '<span style="color:var(--text-dim);">等待数据...</span>'}
+    </div>
+    <div style="text-align:center;margin-top:8px;display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;">
+      <button onclick="loadStats()" style="font-size:10px;padding:4px 12px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);color:var(--mech-accent);border-radius:4px;cursor:pointer;">刷新</button>
+      <button onclick="exportData()" style="font-size:10px;padding:4px 12px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);color:var(--mech-accent);border-radius:4px;cursor:pointer;">导出CSV</button>
+      <div style="display:flex;align-items:center;gap:4px;margin-left:8px;border-left:1px solid rgba(0,212,255,0.15);padding-left:8px;">
+        <label style="font-size:10px;color:var(--text-dim);cursor:pointer;display:flex;align-items:center;gap:4px;">
+          <input type="checkbox" id="chkContribute" onchange="toggleContribute()" style="accent-color:var(--mech-accent);cursor:pointer;">
+          数据回传
+        </label>
+        <span id="contributeStatus" style="font-size:9px;color:var(--text-dim);">关闭</span>
+      </div>
+    </div>
+  `;
+}
+
+function exportData() {
+  const hours = document.getElementById('statsPeriod').value;
+  window.open(API_BASE + '/data/export?hours=' + hours, '_blank');
+}
+
+// ========== 数据回传 ==========
+let _contributeTimer = null;
+
+function toggleContribute() {
+  const chk = document.getElementById('chkContribute');
+  const status = document.getElementById('contributeStatus');
+  const enabled = chk.checked;
+  localStorage.setItem('ce_contribute', enabled ? '1' : '0');
+  fetch(API_BASE + '/data/contribute/enable', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({enabled})
+  });
+  if (enabled) {
+    status.textContent = '已开启';
+    status.style.color = '#00ff88';
+    log('📡 数据回传已开启（匿名贡献预测数据，助改进模型）', 'info');
+    // 每10分钟自动回传一次
+    doContribute();
+    _contributeTimer = setInterval(doContribute, 600000);
+  } else {
+    status.textContent = '关闭';
+    status.style.color = 'var(--text-dim)';
+    log('📡 数据回传已关闭', 'info');
+    if (_contributeTimer) { clearInterval(_contributeTimer); _contributeTimer = null; }
+  }
+}
+
+async function doContribute() {
+  try {
+    const hours = document.getElementById('statsPeriod').value;
+    const r = await fetch(API_BASE + '/data/contribute?hours=' + hours, {method: 'POST'});
+    const d = await r.json();
+    if (d.ok && d.summary && d.summary.total > 0) {
+      console.log(`[CONTRIBUTE] 已准备回传 ${d.summary.total} 条数据（胜率${d.summary.win_rate}%）`);
+    }
+  } catch(e) { /* 静默失败 */ }
+}
+
+// 页面加载时恢复用户偏好
+(function restoreContribute() {
+  const saved = localStorage.getItem('ce_contribute');
+  if (saved === '1') {
+    document.getElementById('chkContribute').checked = true;
+    toggleContribute();
+  }
+})();
+
+// 启动时加载一次，之后每30秒刷新
+function startStatsPolling() {
+  loadStats();
+  if (_statsTimer) clearInterval(_statsTimer);
+  _statsTimer = setInterval(loadStats, 30000);
+}
+
+// ========== VOICE (Web Speech API) ==========
+const VoiceEngine = {
+  _queue: [],
+  _speaking: false,
+  _enabled: true,
+
+  init() {
+    const chk = document.getElementById('chkVoice');
+    const track = document.getElementById('voiceToggleTrack');
+    const thumb = document.getElementById('voiceToggleThumb');
+    if (!chk) return;
+    this._enabled = chk.checked;
+
+    const updateUI = () => {
+      if (chk.checked) {
+        track.style.background = 'rgba(0,212,255,0.3)';
+        track.style.borderColor = 'var(--mech-accent)';
+        thumb.style.left = '21px';
+      } else {
+        track.style.background = 'rgba(255,255,255,0.1)';
+        track.style.borderColor = 'rgba(255,255,255,0.15)';
+        thumb.style.left = '3px';
+      }
+    };
+    updateUI();
+
+    chk.addEventListener('change', () => {
+      this._enabled = chk.checked;
+      updateUI();
+      if (this._enabled) this.speak('语音播报已开启');
+    });
+  },
+
+  speak(text, priority = 'normal') {
+    if (!this._enabled || !('speechSynthesis' in window)) return;
+    // high priority: cancel current speech
+    if (priority === 'high') {
+      window.speechSynthesis.cancel();
+      this._queue = [];
+      this._speaking = false;
+    }
+    this._queue.push(text);
+    this._processQueue();
+  },
+
+  _processQueue() {
+    if (this._speaking || this._queue.length === 0) return;
+    const text = this._queue.shift();
+    if (!text) return;
+
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.lang = 'zh-CN';
+    utt.rate = 1.1;
+    utt.pitch = 0.9;
+    utt.volume = 0.8;
+
+    // 尝试选中文语音
+    const voices = window.speechSynthesis.getVoices();
+    const zhVoice = voices.find(v => v.lang.startsWith('zh'));
+    if (zhVoice) utt.voice = zhVoice;
+
+    utt.onend = () => { this._speaking = false; this._processQueue(); };
+    utt.onerror = () => { this._speaking = false; this._processQueue(); };
+
+    this._speaking = true;
+    window.speechSynthesis.speak(utt);
+  }
+};
+
 // ========== LOG ==========
 function log(msg, type='info') {
   const box = document.getElementById('logContent');
@@ -2017,6 +2534,52 @@ function updateModelGauges(groupConfs) {
       dir.className = 'model-dir ' + (isUp ? 'dir-up' : 'dir-down');
     }
   });
+}
+
+// ========== RULE MODEL LIGHTS ==========
+function updateRuleLights(details) {
+  if (!details) return;
+  const ruleNames = ['trend', 'mean_rev', 'momentum', 'volume', 'volatility', 'breakout', 'pattern', 'sentiment'];
+  const ruleLabels = ['趋势', '回归', '动量', '量能', '波动', '突破', '形态', '情绪'];
+  ruleNames.forEach((name, i) => {
+    const el = document.getElementById('rule_' + name);
+    if (!el) return;
+    const val = details[name];
+    el.classList.remove('up', 'down');
+    if (val === 1) {
+      el.classList.add('up');
+      el.textContent = '▲' + ruleLabels[i];
+    } else if (val === 0) {
+      el.classList.add('down');
+      el.textContent = '▼' + ruleLabels[i];
+    } else {
+      el.textContent = ruleLabels[i];
+    }
+  });
+}
+
+// ========== DYNAMIC CONFIDENCE DISPLAY ==========
+function updateDynConfDisplay(d) {
+  const el = document.getElementById('dynConfDisplay');
+  if (!el || !d) return;
+  const pct = (d.threshold * 100).toFixed(1);
+  if (d.paused) {
+    el.textContent = '⚠️ 信号暂停';
+    el.style.color = '#ff2d55';
+    el.style.opacity = '1';
+  } else if (d.threshold < 0.63) {
+    el.textContent = '阈值: ' + pct + '% ↓';
+    el.style.color = '#00ff88';
+    el.style.opacity = '0.9';
+  } else if (d.threshold > 0.70) {
+    el.textContent = '阈值: ' + pct + '% ↑';
+    el.style.color = '#ffa502';
+    el.style.opacity = '0.9';
+  } else {
+    el.textContent = '阈值: ' + pct + '%';
+    el.style.color = 'var(--mech-accent)';
+    el.style.opacity = '0.7';
+  }
 }
 
 // ========== WIN RATE CHART ==========
@@ -2104,6 +2667,43 @@ function updateConfRing(conf) {
   if (sub) sub.textContent = conf >= 0.65 ? '置信度充足' : '置信度不足';
 }
 
+// ========== ENTRY SCORE DISPLAY ==========
+function updateEntryScore(entryScore) {
+  const container = document.getElementById('entryScoreDisplay');
+  if (!container || !entryScore) return;
+
+  container.style.display = 'block';
+  const grade = entryScore.grade || 'D';
+  const score = entryScore.score || 0;
+  const details = entryScore.details || {};
+
+  const gradeEl = document.getElementById('entryScoreGrade');
+  const numEl = document.getElementById('entryScoreNum');
+  const detailEl = document.getElementById('entryScoreDetails');
+
+  // 颜色映射
+  const gradeColors = { S: '#ffd700', A: '#00ff88', B: '#00d4ff', C: '#ffa502', D: '#ff2d55' };
+  gradeEl.textContent = grade;
+  gradeEl.style.color = gradeColors[grade] || 'var(--text-dim)';
+  numEl.textContent = score + '/100';
+
+  // 各维度明细
+  const labels = {
+    confidence: '置信度', agreement: '一致性', trend: '趋势',
+    orderbook: '订单簿', sentiment: '情绪', integer: '整数位'
+  };
+  const maxScores = { confidence: 40, agreement: 20, trend: 15, orderbook: 10, sentiment: 10, integer: 5 };
+  let html = '';
+  for (const [key, label] of Object.entries(labels)) {
+    const val = details[key] || 0;
+    const max = maxScores[key];
+    const pct = Math.round((val / max) * 100);
+    const color = pct >= 80 ? '#00ff88' : pct >= 50 ? '#00d4ff' : pct >= 30 ? '#ffa502' : '#ff2d55';
+    html += `<span style="color:${color}">${label}${val}</span>`;
+  }
+  detailEl.innerHTML = html;
+}
+
 // ========== SIGNAL DISPLAY ==========
 function updateSignal(pred, conf) {
   const label = document.getElementById('signalLabel');
@@ -2148,6 +2748,7 @@ function openSlot(slotIdx, pred, conf, price) {
 
   renderSlot(slotIdx);
   log(`SLOT ${slotIdx+1} 开单: ${direction} | 价格 ${price.toFixed(2)} | ${tf}分钟`, 'success');
+  VoiceEngine.speak(`${direction === 'UP' ? '做多' : '做空'}，价格${Math.round(price)}`, 'high');
 }
 
 function renderSlot(idx) {
@@ -2203,13 +2804,15 @@ async function settleSlot(slotIdx) {
     STATE.stats.win++;
     STATE.stats.streak = STATE.stats.streak >= 0 ? STATE.stats.streak + 1 : 1;
     STATE.consecutiveLoss = 0;
-    log(`SLOT ${slotIdx+1} 结算: WIN +85% | ${o.entryPrice.toFixed(2)} → ${closePrice.toFixed(2)}`, 'success');
+    log(`SLOT ${slotIdx+1} 结算: WIN | ${o.entryPrice.toFixed(2)} → ${closePrice.toFixed(2)}`, 'success');
+    VoiceEngine.speak('赢了', 'high');
   } else {
     STATE.stats.lose++;
     STATE.stats.streak = STATE.stats.streak <= 0 ? STATE.stats.streak - 1 : -1;
     STATE.consecutiveLoss++;
     STATE.sameDirectionCount = 0; // 输了就重置同向计数，不再追加限制
     log(`SLOT ${slotIdx+1} 结算: LOSS | ${o.entryPrice.toFixed(2)} → ${closePrice.toFixed(2)}`, 'error');
+    VoiceEngine.speak('输了', 'high');
   }
   STATE.stats.profit += pnl;
   STATE.stats.maxStreak = Math.max(STATE.stats.maxStreak, STATE.stats.streak);
@@ -2262,12 +2865,71 @@ async function settleSlot(slotIdx) {
   }
 
   // ===== 自动下单联动：结算后如果已激活，自动触发下一笔 =====
-  if (AT.licensed && !trader_busy) {
-    setTimeout(() => atAutoTrigger(), 1500); // 稍等价格稳定再取信号
+  if (AT.licensed && AT.autoEnabled && !trader_busy) {
+    setTimeout(() => { atAutoTrigger(); loadStats(); }, 1500); // 稍等价格稳定再取信号 & 刷新统计
   }
 }
 
-// ========== 重训 ==========
+// ========== 重训 / 手动训练 ==========
+async function manualTrain() {
+  if (STATE.retraining) {
+    log('正在训练中，请等待完成...', 'warn');
+    return;
+  }
+  const period = parseInt(document.getElementById('inputTF')?.value || 10);
+  log(`🔧 手动训练开始（周期: ${period}min）...`, 'info');
+  STATE.retraining = true;
+  const btn = document.getElementById('btnTrain');
+  if (btn) { btn.disabled = true; btn.textContent = '训练中...'; }
+
+  try {
+    const r = await fetch(API_BASE + '/train', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({period: period})
+    });
+    const d = await r.json();
+    if (!r.ok) { log('训练请求失败: ' + (d.error || r.statusText), 'error'); return; }
+
+    // 轮询进度
+    const pollId = setInterval(async () => {
+      try {
+        const pr = await fetch(API_BASE + '/train/progress');
+        const pd = await pr.json();
+        document.getElementById('trainFill').style.width = pd.progress + '%';
+        document.getElementById('trainPct').textContent = pd.progress + '%';
+        document.getElementById('trainStatus').textContent = pd.status;
+        document.getElementById('trainProgress').style.display = 'block';
+        if (pd.status && pd.status !== manualTrain._lastStatus) {
+          manualTrain._lastStatus = pd.status;
+          log(`🔧 训练 ${pd.progress}% — ${pd.status}`, 'info');
+        }
+        if (!pd.training) {
+          clearInterval(pollId);
+          document.getElementById('trainProgress').style.display = 'none';
+          STATE.retraining = false;
+          if (btn) { btn.disabled = false; btn.textContent = '🔧 训练'; }
+          log('✅ 训练完成！新模型已加载', 'success');
+          manualTrain._lastStatus = '';
+        }
+      } catch(e) { clearInterval(pollId); STATE.retraining = false; if (btn) { btn.disabled = false; btn.textContent = '🔧 训练'; } }
+    }, 2000);
+
+    // 5分钟超时
+    setTimeout(() => {
+      clearInterval(pollId);
+      document.getElementById('trainProgress').style.display = 'none';
+      STATE.retraining = false;
+      if (btn) { btn.disabled = false; btn.textContent = '🔧 训练'; }
+      log('⚠ 训练超时（5分钟），请检查日志', 'warn');
+    }, 300000);
+  } catch(e) {
+    STATE.retraining = false;
+    if (btn) { btn.disabled = false; btn.textContent = '🔧 训练'; }
+    log('训练请求异常: ' + e.message, 'error');
+  }
+}
+
 async function triggerRetrain() {
   if (STATE.retraining) return;
   STATE.retraining = true;
@@ -2281,10 +2943,13 @@ async function triggerRetrain() {
         body: JSON.stringify({period: trainPeriod})
       });
       const d = await r.json();
-      log('后端重训已触发，系统继续运行', 'info');
-      // 轮询训练进度
+      log('🔄 触发后台重训...', 'info');
+      // 轮询训练进度（5分钟超时）
+      let pollCount = 0;
+      const maxPolls = 150;
       const pollId = setInterval(async () => {
         try {
+          pollCount++;
           const pr = await fetch(API_BASE + '/train/progress');
           const pd = await pr.json();
           document.getElementById('trainFill').style.width = pd.progress + '%';
@@ -2296,7 +2961,13 @@ async function triggerRetrain() {
             document.getElementById('trainProgress').style.display = 'none';
             STATE.retraining = false;
             document.getElementById('systemPhase').textContent = 'ACTIVE';
-            log('模型重训完成，恢复正常运行', 'success');
+            log('✅ 重训完成，新模型已生效', 'success');
+          } else if (pollCount >= maxPolls) {
+            clearInterval(pollId);
+            document.getElementById('trainProgress').style.display = 'none';
+            STATE.retraining = false;
+            document.getElementById('systemPhase').textContent = 'ACTIVE';
+            log('⚠ 重训超时（5分钟），使用当前模型继续运行', 'warn');
           }
         } catch(e) { clearInterval(pollId); STATE.retraining = false; }
       }, 2000);
@@ -2382,14 +3053,24 @@ async function runPredictionCycle() {
         trendDir = d.trend_dir ?? 0;
         againstTrend = d.against_trend ?? false;
         agreementRate = d.agreement_rate ?? 0.5;
+        // 更新规则模型指示灯
+        updateRuleLights(d.technical_details);
+        // 更新进场评分
+        updateEntryScore(d.entry_score);
+        // 刷新动态阈值显示
+        try {
+          const dcR = await fetch(API_BASE + '/dynamic-conf');
+          if (dcR.ok) updateDynConfDisplay(await dcR.json());
+        } catch(e) {}
         // 同步更新STATE供复利模块获取
         STATE.lastSignal = pred === 1 ? 'up' : 'down';
         const nearInt = d.near_integer ? ` [整数位 ${d.key_level}]` : '';
+        if (d.near_integer) VoiceEngine.speak(`注意，接近${d.key_level}整数位`, 'high');
         const trendEmoji = trendDir === 1 ? '📈' : trendDir === -1 ? '📉' : '➡️';
         const trendLabel = trendDir === 1 ? '上涨' : trendDir === -1 ? '下跌' : '震荡';
         const adxVal = d.trend_details?.adx ?? '--';
         const agreeStr = `一致性${(agreementRate*100).toFixed(0)}%`;
-        log(`[${periodVal}min] 真实预测: ${pred===1?'▲涨':'▼跌'} 置信${(conf*100).toFixed(1)}% ${agreeStr}${nearInt} | ${d.up_votes}↑/${d.down_votes}↓ (${d.total_models}模型)`, 'info');
+        log(`[${periodVal}min] 真实预测: ${pred===1?'▲涨':'▼跌'} 置信${(conf*100).toFixed(1)}% ${agreeStr}${nearInt} | ML:${d.up_votes}↑/${d.down_votes}↓ 规则:${d.technical_up}↑/${d.technical_down}↓`, 'info');
         log(`${trendEmoji} 趋势: ${trendLabel} ADX=${adxVal}${againstTrend ? ' ⚠️逆势信号' : ''}`, againstTrend ? 'warn' : 'info');
       }
     } catch(e) {
@@ -2686,8 +3367,13 @@ async function startEngine() {
 
   // 检查后端
   const status = await checkBackend();
-  if (status && status.model_count === 0) {
-    log('后端已连接但模型未加载，建议先点"训练模型"', 'warn');
+  if (status && (status.model_count === 0) && (status.total_model_count === 0 || !status.total_model_count)) {
+    log('后端已连接但模型未加载，启动后自动训练...', 'warn');
+  }
+
+  // 启动后自动触发后台训练
+  if (backendAvailable && !STATE.retraining) {
+    autoTrainBackground();
   }
 
   connectKline(STATE.currentTF);
@@ -2766,14 +3452,13 @@ function stopEngine() {
   log('引擎已停止', 'warn');
 }
 
-// ========== 手动训练 ==========
-async function trainModel() {
-  const btn = document.getElementById('btnTrain');
-  if (btn) btn.disabled = true;
+// ========== 后台自动训练 ==========
+async function autoTrainBackground() {
+  STATE.retraining = true;
   document.getElementById('trainProgress').style.display = 'block';
+  log('⚡ 后台训练已启动...', 'info');
   
   if (backendAvailable) {
-    log('触发后端训练...', 'info');
     try {
       const trainPeriod = parseInt(document.getElementById('inputTF')?.value || 10);
       await fetch(API_BASE + '/train', {
@@ -2781,46 +3466,47 @@ async function trainModel() {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({period: trainPeriod})
       });
+      let pollCount = 0;
+      const maxPolls = 150; // 5分钟超时（每2秒一次）
       const pollId = setInterval(async () => {
         try {
+          pollCount++;
           const pr = await fetch(API_BASE + '/train/progress');
           const pd = await pr.json();
           document.getElementById('trainFill').style.width = pd.progress + '%';
           document.getElementById('trainPct').textContent = pd.progress + '%';
           document.getElementById('trainStatus').textContent = pd.status;
+          // 进度变化时写入日志区
+          if (pd.status && pd.status !== autoTrainBackground._lastStatus) {
+            autoTrainBackground._lastStatus = pd.status;
+            log(`🔧 训练 ${pd.progress}% — ${pd.status}`, 'info');
+          }
           if (!pd.training) {
             clearInterval(pollId);
             document.getElementById('trainProgress').style.display = 'none';
             STATE.trained = true;
-            if (btn) btn.disabled = false;
-            log('训练完成！', 'success');
+            STATE.retraining = false;
+            autoTrainBackground._lastStatus = '';
+            log('✅ 模型训练完成，已自动切换新模型', 'success');
+          } else if (pollCount >= maxPolls) {
+            clearInterval(pollId);
+            document.getElementById('trainProgress').style.display = 'none';
+            STATE.retraining = false;
+            autoTrainBackground._lastStatus = '';
+            log('⚠ 训练超时（5分钟），使用已有模型继续运行', 'warn');
           }
-        } catch(e) { clearInterval(pollId); if (btn) btn.disabled = false; }
+        } catch(e) { clearInterval(pollId); STATE.retraining = false; }
       }, 2000);
     } catch(e) {
-      log('训练请求失败', 'error');
-      if (btn) btn.disabled = false;
+      log('训练请求失败，使用已有模型继续运行', 'error');
+      document.getElementById('trainProgress').style.display = 'none';
+      STATE.retraining = false;
     }
   } else {
-    // 模拟训练
-    log('后端未连接，模拟训练中...', 'warn');
-    let p = 0;
-    const msgs = ['获取K线数据...','计算技术特征...','训练RF x3...','训练XGB x2...','训练LGB x2...','训练MLP...','集成投票...','完成'];
-    const intv = setInterval(() => {
-      p += 12;
-      document.getElementById('trainFill').style.width = Math.min(p,100) + '%';
-      document.getElementById('trainPct').textContent = Math.min(p,100) + '%';
-      document.getElementById('trainStatus').textContent = msgs[Math.floor(p/12)] || '完成';
-      if (p >= 96) {
-        clearInterval(intv);
-        setTimeout(() => {
-          document.getElementById('trainProgress').style.display = 'none';
-          STATE.trained = true;
-          if (btn) btn.disabled = false;
-          log('本地模拟训练完成（连接后端可获得真实模型）', 'success');
-        }, 500);
-      }
-    }, 500);
+    // 无后端时模拟训练
+    log('后端未连接，跳过训练', 'warn');
+    document.getElementById('trainProgress').style.display = 'none';
+    STATE.retraining = false;
   }
 }
 
@@ -2921,11 +3607,9 @@ async function atVerifyLicense() {
       document.getElementById('atAutoStatus').style.display = 'block';
       const sa = document.getElementById('atSettingsArea');
       if (sa) { sa.style.opacity = '1'; sa.style.pointerEvents = 'auto'; }
-      // 自动勾选普通/复利模式自动下单
+      // 自动勾选普通模式自动下单（复利模式用自己的按钮控制，不需要勾选框）
       const normalAutoCheck = document.getElementById('atNormalAutoCheck');
-      const compoundAutoCheck = document.getElementById('atCompoundAutoCheck');
       if (normalAutoCheck) { normalAutoCheck.checked = true; atToggleNormalAuto(true); }
-      if (compoundAutoCheck) { compoundAutoCheck.checked = true; atToggleCompoundAuto(true); }
       msg.textContent = d.message; msg.style.color = 'var(--mech-green)';
       localStorage.setItem('ce_license', code);
       atLog('✅ 注册码验证成功，联动模式已自动启用');
@@ -2958,7 +3642,7 @@ function atUpdatePlatform() {
     document.getElementById('atNormalAmount').step='1'; document.getElementById('atNormalAmount').min='5';
     document.getElementById('atInitial').step='1'; document.getElementById('atInitial').min='5';
   } else {
-    hint.textContent = '（山寨所最低3u，可3位小数）';
+    hint.textContent = '（HiBT最低3u，可3位小数）';
     document.getElementById('atNormalAmount').step='0.001'; document.getElementById('atNormalAmount').min='3';
     document.getElementById('atInitial').step='0.001'; document.getElementById('atInitial').min='3';
   }
@@ -3097,50 +3781,55 @@ function atCalibrateRunStep() {
   _calibrateLastPos = null;
   _calibrateHoldStart = null;
   _calibrateCountingDown = false;
-  // 实时轮询鼠标位置（每200ms），检测悬停
+  // 实时轮询鼠标位置（每300ms），检测悬停
   clearInterval(_calibratePollTimer);
   _calibratePollTimer = setInterval(async () => {
     if (!_calibrateActive) { clearInterval(_calibratePollTimer); return; }
     try {
-      const r = await fetch(API_BASE + '/auto_trade/mouse_pos');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const r = await fetch(API_BASE + '/auto_trade/mouse_pos', { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (!r.ok) return;
       const d = await r.json();
-      if (!d.ok) return;
-      const curPos = `${d.x},${d.y}`;
-      document.getElementById('calibrateLivePos').textContent = d.x + ' , ' + d.y;
-      // 如果鼠标位置稳定，开始倒计时
-      if (curPos === _calibrateLastPos && !_calibrateCountingDown) {
-        if (!_calibrateHoldStart) _calibrateHoldStart = Date.now();
-        const heldMs = Date.now() - _calibrateHoldStart;
-        if (heldMs >= 500) {  // 稳定0.5秒后开始显示倒计时
-          _calibrateCountingDown = true;
-          document.getElementById('calibrateRingWrap').style.display = 'block';
+      if (d.ok && d.x !== undefined && d.y !== undefined) {
+        const curPos = `${d.x},${d.y}`;
+        document.getElementById('calibrateLivePos').textContent = d.x + ' , ' + d.y;
+        // 如果鼠标位置稳定，开始倒计时
+        if (curPos === _calibrateLastPos && !_calibrateCountingDown) {
+          if (!_calibrateHoldStart) _calibrateHoldStart = Date.now();
+          const heldMs = Date.now() - _calibrateHoldStart;
+          if (heldMs >= 500) {  // 稳定0.5秒后开始显示倒计时
+            _calibrateCountingDown = true;
+            document.getElementById('calibrateRingWrap').style.display = 'block';
+          }
+        } else if (curPos !== _calibrateLastPos) {
+          // 鼠标移动了，重置
+          _calibrateLastPos = curPos;
+          _calibrateHoldStart = null;
+          _calibrateCountingDown = false;
+          document.getElementById('calibrateRingWrap').style.display = 'none';
+          _calibrateCountdownSec = 5;
         }
-      } else if (curPos !== _calibrateLastPos) {
-        // 鼠标移动了，重置
-        _calibrateLastPos = curPos;
-        _calibrateHoldStart = null;
-        _calibrateCountingDown = false;
-        document.getElementById('calibrateRingWrap').style.display = 'none';
-        _calibrateCountdownSec = 5;
-      }
-      // 如果正在倒计时
-      if (_calibrateCountingDown && _calibrateHoldStart) {
-        const heldSec = Math.floor((Date.now() - _calibrateHoldStart) / 1000);
-        const remaining = Math.max(0, 5 - heldSec);
-        if (remaining !== _calibrateCountdownSec) {
-          _calibrateCountdownSec = remaining;
-          document.getElementById('calibrateCountdown').textContent = remaining;
-          const ring = document.getElementById('calibrateRing');
-          ring.style.strokeDashoffset = String(138.2 * (1 - remaining / 5));
+        // 如果正在倒计时
+        if (_calibrateCountingDown && _calibrateHoldStart) {
+          const heldSec = Math.floor((Date.now() - _calibrateHoldStart) / 1000);
+          const remaining = Math.max(0, 5 - heldSec);
+          if (remaining !== _calibrateCountdownSec) {
+            _calibrateCountdownSec = remaining;
+            document.getElementById('calibrateCountdown').textContent = remaining;
+            const ring = document.getElementById('calibrateRing');
+            ring.style.strokeDashoffset = String(138.2 * (1 - remaining / 5));
+          }
+          if (remaining === 0) {
+            // 倒计时结束，自动录入
+            clearInterval(_calibratePollTimer);
+            atCalibrateAutoCapture(d.x, d.y);
+          }
         }
-        if (remaining === 0) {
-          // 倒计时结束，自动录入
-          clearInterval(_calibratePollTimer);
-          atCalibrateAutoCapture(d.x, d.y);
-        }
-      }
+      } // end if d.ok
     } catch(e) {}
-  }, 200);
+  }, 300);
 }
 
 // 自动录入坐标（5秒悬停后调用）
@@ -3293,8 +3982,12 @@ async function atAutoTrigger() {
       body: JSON.stringify({ amount, direction })
     });
     const d = await r.json();
-    if (d.ok) {
-      atLog(`🤖 联动下单：${amount}u ${direction === 'up' ? '📈买涨' : '📉买跌'}`);
+    if (d.ok && d.success) {
+      atLog(`🤖 联动下单成功：${amount}u ${direction === 'up' ? '📈买涨' : '📉买跌'}`);
+    } else if (d.error) {
+      atLog('❌ 联动下单失败：' + d.error);
+    } else if (d.ok && !d.success) {
+      atLog('⚠️ 联动下单未执行（pyautogui不可用或坐标未标定）');
     } else {
       atLog('❌ 联动下单失败：' + (d.error || '未知错误'));
     }
@@ -3343,6 +4036,18 @@ async function atReportResult(result) {
       body:JSON.stringify({result})
     });
     atLog(result==='win'?'🎉 本轮：赢':'💸 本轮：输，重置计数');
+    // 同步更新动态置信度阈值
+    try {
+      const r = await fetch(API_BASE+'/settle', {
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({result})
+      });
+      if (r.ok) {
+        const d = await r.json();
+        updateDynConfDisplay(d);
+        if (d.paused) { atLog('🛑 连败5次，动态阈值已暂停信号！', 'warn'); VoiceEngine.speak('连败5次，信号已暂停', 'high'); }
+      }
+    } catch(e) { /* settle失败不影响主流程 */ }
     setTimeout(()=>{hint.textContent='';},2000);
   } catch(e) { atLog('上报失败'); }
 }
@@ -3419,11 +4124,9 @@ function atInit() {
           document.getElementById('atAutoStatus').style.display='block';
           const sa=document.getElementById('atSettingsArea');
           if(sa){sa.style.opacity='1';sa.style.pointerEvents='auto';}
-          // 恢复普通/复利模式勾选状态
+          // 恢复普通模式勾选状态
           const normalAutoCheck = document.getElementById('atNormalAutoCheck');
-          const compoundAutoCheck = document.getElementById('atCompoundAutoCheck');
           if (normalAutoCheck) { normalAutoCheck.checked = true; atToggleNormalAuto(true); }
-          if (compoundAutoCheck) { compoundAutoCheck.checked = true; atToggleCompoundAuto(true); }
         }
       }catch(e){}
     },2000);
@@ -3436,6 +4139,8 @@ window.addEventListener('DOMContentLoaded', () => {
   checkBackend();
   updateStats();
   renderHistory();
+  VoiceEngine.init();
+  startStatsPolling();  // 启动预测统计轮询
   
   // 隐藏训练进度条
   const tp = document.getElementById('trainProgress');
@@ -3463,7 +4168,7 @@ window.addEventListener('DOMContentLoaded', () => {
   
   log('复利引擎初始化完成', 'success');
   log('BTC实时数据流已连接', 'info');
-  log('点击"启动"开始自动交易', 'info');
+  log('点击"启动"开始自动交易（训练自动后台进行）', 'info');
   if (!backendAvailable) {
     log('提示：运行 compound_engine_server.py 可启用真实21模型预测', 'warn');
   }
@@ -3483,7 +4188,7 @@ function checkVPNConnection() {
 
     // 方式1：用Image加载Google favicon（国内不通，有VPN才能加载）
     const img = new Image();
-    const timer = setTimeout(() => done(false), 8000);
+    const timer = setTimeout(() => done(false), 3000);
     img.onload = () => { clearTimeout(timer); done(true); };
     img.onerror = () => { clearTimeout(timer); done(false); };
     img.src = 'https://www.google.com/favicon.ico?_t=' + Date.now();

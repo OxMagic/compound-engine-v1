@@ -9,12 +9,14 @@ __pycache__/
 venv/
 env/
 .env
+.env.example
 .venv
 
 # 日志和CSV
 *.csv
 *.log
 health_log.txt
+_debug_err.txt
 
 # 本地诊断脚本（不需要上传）
 diag_*.py
@@ -38,7 +40,9 @@ desktop.ini
 
 # 打包输出
 dist/
+dist2/
 build/
+build2/
 *.spec
 
 # logo设计过程（定稿后单独处理）
@@ -49,3 +53,25 @@ logo/
 
 # 系统文件
 .DS_Store
+
+# SQLite数据库（本地预测日志，不上传）
+prediction_log.db
+prediction_history_export.csv
+
+# WorkBuddy工作目录
+.workbuddy/
+.codebuddy/
+
+# 注册码缓存
+.license_cache
+
+# Python版本文件
+.python-version
+
+# 重复/过时文件
+README.txt
+部署教程.txt
+复利引擎_上下文交接文档.txt
+
+# 开发辅助
+auto_trade_coords.json

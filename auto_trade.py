@@ -6,7 +6,7 @@ auto_trade.py
   - 坐标标定（点击界面上的4个位置）
   - 普通模式：固定金额下单
   - 复利模式：余额×赔率滚仓，赢N次停，输了重置
-  - 支持币安（≥5u整数）和山寨所（≥3u三位小数）
+  - 支持币安（≥5u整数）和HiBT（≥3u三位小数）
   - 注册码验证（GitHub JSON在线验证）
 """
 
@@ -43,7 +43,7 @@ PLATFORM_RULES = {
         "default_payout": 0.8,
     },
     "altcoin": {
-        "name": "山寨所",
+        "name": "HiBT",
         "min_amount": 3.0,
         "decimals": 3,      # 最多3位小数
         "default_payout": 0.85,
@@ -62,7 +62,7 @@ def format_amount(amount: float, platform: str) -> float:
         # 币安：向下取整
         formatted = math.floor(amount)
     else:
-        # 山寨所：保留N位小数，向下截断
+        # HiBT：保留N位小数，向下截断
         factor = 10 ** decimals
         formatted = math.floor(amount * factor) / factor
 
@@ -255,28 +255,29 @@ class AutoTrader:
 
     def start_normal(self, coords: dict, amount: float, direction: str):
         """
-        普通模式：固定金额，单次下单
+        普通模式：固定金额，单次下单（同步执行，等待点击完成后再返回）
         direction: 'up' 或 'down'，由预测信号给
         """
         if self.running:
             return {"error": "已有下单任务在运行"}
 
-        def _run():
-            self.running = True
-            self.status = "running"
-            self._append_log(f"▶ 普通模式下单：{amount}u → {direction}")
+        self.running = True
+        self.status = "running"
+        self._append_log(f"▶ 普通模式下单：{amount}u → {direction}")
+        ok = False
+        try:
             ok = execute_single_trade(coords, amount, direction)
             if ok:
                 self._append_log(f"✅ 下单完成：{amount}u {direction}")
                 self.status = "completed"
             else:
-                self._append_log("❌ 下单失败")
+                self._append_log("❌ 下单失败（pyautogui不可用或坐标无效）")
                 self.status = "error"
-            self.running = False
-
-        self.thread = threading.Thread(target=_run, daemon=True)
-        self.thread.start()
-        return {"ok": True}
+        except Exception as e:
+            self._append_log(f"❌ 下单异常：{e}")
+            self.status = "error"
+        self.running = False
+        return {"ok": True, "success": ok}
 
     def start_compound(self, coords: dict, initial: float, payout_rate: float,
                        rounds: int, platform: str, direction_func):
@@ -509,6 +510,6 @@ if __name__ == "__main__":
 
     print()
     plan2 = calculate_compound_plan(10.0, 0.85, 5, "altcoin")
-    print("山寨所 复利计划（初始10u，赔率0.85，5连赢）：")
+    print("HiBT 复利计划（初始10u，赔率0.85，5连赢）：")
     for p in plan2:
         print(f"  第{p['round']}注：下注 {p['bet']}u | 余额 {p['balance_before']}u → {p['expected_balance']}u")

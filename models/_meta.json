@@ -1,0 +1,24 @@
+{
+  "period": 10,
+  "feature_count": 138,
+  "trained_models": [
+    "rf1",
+    "rf2",
+    "rf3",
+    "et",
+    "gb",
+    "mlp",
+    "lda",
+    "qda",
+    "nb",
+    "knn",
+    "lr",
+    "lgb1",
+    "lgb2",
+    "xgb1",
+    "xgb2",
+    "cat1",
+    "cat2"
+  ],
+  "timestamp": "2026-04-03T03:51:14.145895"
+}
