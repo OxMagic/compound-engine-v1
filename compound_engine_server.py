@@ -3296,3 +3296,11 @@ def api_license_verify():
 
 if __name__ == '__main__':
     main()
+else:
+    # gunicorn / WSGI 模式下也需要启动后台线程
+    print("[INFO] WSGI 模式启动，初始化后台线程...")
+    t = threading.Thread(target=load_all_models, daemon=True)
+    t.start()
+    t_settle = threading.Thread(target=auto_settle_loop, daemon=True)
+    t_settle.start()
+    print("[INFO] 自动补全线程已启动（每60秒结算到期预测）")
